@@ -141,7 +141,7 @@ def get_fleet_data(namespace):
     """Returns a list of dictionaries, one for every entry in the namespace."""
     datastore_client = datastore.Client(namespace=namespace)
     answers = []
-    for item in datastore_client.query(kind='rsync_url').fetch():
+    for item in datastore_client.query(kind='dropboxrsyncaddress').fetch():
         answer = {}
         answer[KEYS[0]] = item.key.name
         for k in KEYS[1:]:
