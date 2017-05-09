@@ -37,6 +37,7 @@ apis, you could use the following command line:
 
 import argparse
 import BaseHTTPServer
+import datetime
 import logging
 import random
 import SocketServer
@@ -327,7 +328,7 @@ def parse_xdatetime(xdatetime):
         return None
     try:
         dt = dateutil.parser.parse(xdatetime[1:])
-        epoch = datetime(1970, 1, 1)
+        epoch = datetime.datetime(1970, 1, 1)
         return int((dt - epoch).total_seconds())
     except ValueError:
         return None
