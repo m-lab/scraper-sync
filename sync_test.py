@@ -252,3 +252,7 @@ class TestSync(unittest.TestCase):
 
         mock_service.spreadsheets().values().get().execute.assert_called()
         self.assertIn('ERROR', [x.levelname for x in log.records])
+
+    def test_parse_xdatetime(self):
+        self.assertEqual(sync.parse_xdatetime('x1970-1-1'), 0)
+        self.assertEqual(sync.parse_xdatetime('x1970-1-1 00:01:00'), 60)
