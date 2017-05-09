@@ -51,6 +51,8 @@ from google.cloud import datastore
 from oauth2client.contrib import gce
 
 import prometheus_client
+import prometheus_client.core
+
 
 # Prometheus histogram buckets are web-response-sized by default, with lots of
 # sub-second buckets and very few multi-second buckets.  We need to change them
@@ -320,6 +322,45 @@ class Spreadsheet(object):
         return self._update_spreadsheet(header, new_rows)
 
 
+class PrometheusDatastoreCollector(object):
+    def __init__(self, namespace):
+        self.namespace = namespace
+
+    def collect(self):
+        last_success = prometheus_client.core.GaugeMetricFamily(
+            'scraper_lastsuccessfulcollection',
+            'Time of the last successful collection',
+            labels=['rsync_url'])
+        last_attempt = prometheus_client.core.GaugeMetricFamily(
+            'scraper_lastcollectionattempt',
+            'Time of the last collection attempt',
+            labels=['rsync_url'])
+        max_filetime = prometheus_client.core.GaugeMetricFamily(
+            'scraper_maxrawfiletimearchived',
+            'Time before which files may be deleted',
+            labels=['rsync_url'])
+        data = get_fleet_data(self.namespace)
+        for fact in data:
+            if 'dropboxrsyncaddress' not in fact:
+                continue
+            rsync_url = fact['dropboxrsyncaddress']
+            if 'lastsuccessfulcollection' in fact:
+                timestamp = parse_xdatetime(fact['lastsuccessfulcollection'])
+                if timestamp is not None:
+                    last_success.add_metric([rsync_url], timestamp)
+            if 'lastcollectionattempt' in fact:
+                timestamp = parse_xdatetime(fact['lastcollectionattempt'])
+                if timestamp is not None:
+                    last_attempt.add_metric([rsync_url], timestamp)
+            if 'maxrawfilemtimearchived' in fact:
+                timestamp = fact['maxrawfilemtimearchived']
+                if timestamp.isdigit():
+                    max_filetime.add_metric([rsync_url], int(timestamp))
+        yield last_success
+        yield last_attempt
+        yield max_filetime
+
+
 def main(argv):  # pragma: no cover
     """Update the spreadsheet in a loop.
 
@@ -343,6 +384,9 @@ def main(argv):  # pragma: no cover
         'sheets', 'v4', discoveryServiceUrl=discovery_url,
         credentials=creds, cache_discovery=False)
     spreadsheet = Spreadsheet(sheets_service, args.spreadsheet)
+    # Set up the prometheus sync job
+    prometheus_client.core.REGISTRY.register(
+        PrometheusDatastoreCollector(args.datastore_namespace))
     # Set up the monitoring
     prometheus_client.start_http_server(args.prometheus_port)
     start_webserver_in_new_thread(args.webserver_port)
