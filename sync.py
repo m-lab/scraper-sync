@@ -47,12 +47,12 @@ import time
 import traceback
 
 import apiclient
-from google.cloud import datastore
-from oauth2client.contrib import gce
-
+import dateutil.parser
 import prometheus_client
 import prometheus_client.core
 
+from google.cloud import datastore
+from oauth2client.contrib import gce
 
 # Prometheus histogram buckets are web-response-sized by default, with lots of
 # sub-second buckets and very few multi-second buckets.  We need to change them
@@ -320,6 +320,17 @@ class Spreadsheet(object):
             new_row = [updated_data[rsync_url][h] for h in header]
             new_rows.append(new_row)
         return self._update_spreadsheet(header, new_rows)
+
+
+def parse_xdatetime(xdatetime):
+    if not xdatetime or xdatetime[0] != 'x':
+        return None
+    try:
+        dt = dateutil.parser.parse(xdatetime[1:])
+        epoch = datetime(1970, 1, 1)
+        return int((dt - epoch).total_seconds())
+    except ValueError:
+        return None
 
 
 class PrometheusDatastoreCollector(object):
