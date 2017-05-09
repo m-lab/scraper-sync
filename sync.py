@@ -365,9 +365,11 @@ class PrometheusDatastoreCollector(object):
                 if timestamp is not None:
                     last_attempt.add_metric([rsync_url], timestamp)
             if 'maxrawfilemtimearchived' in fact:
-                timestamp = fact['maxrawfilemtimearchived']
-                if timestamp.isdigit():
-                    max_filetime.add_metric([rsync_url], int(timestamp))
+                try:
+                    timestamp = int(fact['maxrawfilemtimearchived'])
+                    max_filetime.add_metric([rsync_url], timestamp)
+                except ValueError:
+                    pass
         yield last_success
         yield last_attempt
         yield max_filetime
