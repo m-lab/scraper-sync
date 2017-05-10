@@ -22,4 +22,4 @@ spec:
             - name: NAMESPACE
               value: scraper
             - name: SPREADSHEET
-              value: 143pU25GJidW2KZ_93hgzHdqTqq22wgdxR_3tt3dvrJY
+              value: #Travis or the human doing this should fill this in by hand
