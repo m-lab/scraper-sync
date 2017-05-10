@@ -324,21 +324,32 @@ class Spreadsheet(object):
 
 
 def parse_xdatetime(xdatetime):
+    """Turn a datetime string into seconds since epoch.
+
+    Data is stored in the coordinating spreadsheet as a date (plus optional
+    time) string with a leading 'x' character.  The leading x is to prevent the
+    spreadsheet from "helpfully" interpreting it as a datetime rather than just
+    holding the string.  This converts from that string format into seconds
+    since epoch.
+    """
     if not xdatetime or xdatetime[0] != 'x':
         return None
     try:
-        dt = dateutil.parser.parse(xdatetime[1:])
+        timestamp = dateutil.parser.parse(xdatetime[1:])
         epoch = datetime.datetime(1970, 1, 1)
-        return int((dt - epoch).total_seconds())
+        return int((timestamp - epoch).total_seconds())
     except ValueError:
         return None
 
 
 class PrometheusDatastoreCollector(object):
+    """A collector to forward the contents of cloud datastore to prometheus."""
+
     def __init__(self, namespace):
         self.namespace = namespace
 
     def collect(self):
+        """Get the data from cloud datastore and yield a series of metrics."""
         last_success = prometheus_client.core.GaugeMetricFamily(
             'scraper_lastsuccessfulcollection',
             'Time of the last successful collection',
@@ -353,8 +364,6 @@ class PrometheusDatastoreCollector(object):
             labels=['rsync_url'])
         data = get_fleet_data(self.namespace)
         for fact in data:
-            if 'dropboxrsyncaddress' not in fact:
-                continue
             rsync_url = fact['dropboxrsyncaddress']
             if 'lastsuccessfulcollection' in fact:
                 timestamp = parse_xdatetime(fact['lastsuccessfulcollection'])

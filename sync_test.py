@@ -256,3 +256,28 @@ class TestSync(unittest.TestCase):
     def test_parse_xdatetime(self):
         self.assertEqual(sync.parse_xdatetime('x1970-1-1'), 0)
         self.assertEqual(sync.parse_xdatetime('x1970-1-1 00:01:00'), 60)
+        self.assertEqual(sync.parse_xdatetime(''), None)
+        self.assertEqual(sync.parse_xdatetime('1970-1-1'), None)
+        self.assertEqual(sync.parse_xdatetime('x1970-1-1 BADDATA'), None)
+
+    @mock.patch.object(sync, 'datastore')
+    def test_prometheus_forwarding(self, mock_datastore):
+        mock_client = mock.Mock()
+        mock_datastore.Client.return_value = mock_client
+        mock_client.query().fetch.return_value = self.test_datastore_data
+
+        collector = sync.PrometheusDatastoreCollector('test_namespace')
+        metrics = list(collector.collect())
+        self.assertEqual(set(x.name for x in metrics),
+                         set(['scraper_lastsuccessfulcollection',
+                              'scraper_lastcollectionattempt',
+                              'scraper_maxrawfiletimearchived']))
+        for metric in metrics:
+            # spot-check one of the metrics
+            if metric.name == 'scraper_maxrawfiletimearchived':
+                self.assertEqual(set(x[2] for x in metric.samples),
+                                 set([1490746201L, 1490746202L]))
+
+
+if __name__ == '__main__':  # pragma: no cover
+    unittest.main()
