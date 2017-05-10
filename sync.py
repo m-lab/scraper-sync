@@ -335,9 +335,9 @@ def parse_xdatetime(xdatetime):
     if not xdatetime or xdatetime[0] != 'x':
         return None
     try:
-        timestamp = dateutil.parser.parse(xdatetime[1:])
+        parsed_datetime = dateutil.parser.parse(xdatetime[1:])
         epoch = datetime.datetime(1970, 1, 1)
-        return int((timestamp - epoch).total_seconds())
+        return int((parsed_datetime - epoch).total_seconds())
     except ValueError:
         return None
 
