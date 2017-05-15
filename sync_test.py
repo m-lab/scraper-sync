@@ -278,6 +278,11 @@ class TestSync(unittest.TestCase):
             if metric.name == 'scraper_maxrawfiletimearchived':
                 self.assertEqual(set(x[2] for x in metric.samples),
                                  set([1490746201L, 1490746202L]))
+                self.assertIn(
+                    tuple({'machine': 'mlab4.prg01.measurement-lab.org',
+                           'rsync_module': 'switch',
+                           'experiment': 'utility.mlab'}.items()),
+                    set(tuple(x[1].items()) for x in metric.samples))
 
     @mock.patch.object(sync, 'datastore')
     @testfixtures.log_capture()
