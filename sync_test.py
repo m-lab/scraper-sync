@@ -33,30 +33,31 @@ import sync
 
 class TestSync(unittest.TestCase):
 
-    def setUp(self):
-        class FakeEntity(dict):
+    class FakeEntity(dict):
 
-            def __init__(self, key, kv_pairs):
-                dict.__init__(self, **kv_pairs)
-                self.key = mock.Mock()
-                self.key.name = key
+        def __init__(self, key, kv_pairs):
+            dict.__init__(self, **kv_pairs)
+            self.key = mock.Mock()
+            self.key.name = key
+
+    def setUp(self):
 
         self.test_datastore_data = [
-            FakeEntity(
+            TestSync.FakeEntity(
                 u'rsync://utility.mlab.mlab4.prg01.'
                 'measurement-lab.org:7999/switch',
                 {u'lastsuccessfulcollection': 'x2017-03-28',
                  u'errorsincelastsuccessful': '',
                  u'lastcollectionattempt': 'x2017-03-29-21:22',
                  u'maxrawfilemtimearchived': 1490746201L}),
-            FakeEntity(
+            TestSync.FakeEntity(
                 u'rsync://utility.mlab.mlab4.prg01.'
                 'measurement-lab.org:7999/utilization',
                 {u'errorsincelastsuccessful': '',
                  u'lastsuccessfulcollection': 'x2017-03-28',
                  u'lastcollectionattempt': 'x2017-03-29-21:04',
                  u'maxrawfilemtimearchived': 1490746202L}),
-            FakeEntity(
+            TestSync.FakeEntity(
                 u'rsync://utility.mlab.mlab4.sea02.'
                 'measurement-lab.org:7999/switch',
                 {u'lastcollectionattempt': 'x2017-03-29-15:46',
@@ -277,6 +278,40 @@ class TestSync(unittest.TestCase):
             if metric.name == 'scraper_maxrawfiletimearchived':
                 self.assertEqual(set(x[2] for x in metric.samples),
                                  set([1490746201L, 1490746202L]))
+
+    @mock.patch.object(sync, 'datastore')
+    @testfixtures.log_capture()
+    def test_prometheus_forwarding_with_bad_data(self, mock_datastore, log):
+        mock_client = mock.Mock()
+        mock_datastore.Client.return_value = mock_client
+        self.test_datastore_data.append(
+            TestSync.FakeEntity(u'rsync://badbad', {}))
+        mock_client.query().fetch.return_value = self.test_datastore_data
+
+        collector = sync.PrometheusDatastoreCollector('test_namespace')
+        metrics = list(collector.collect())
+        self.assertEqual(set(x.name for x in metrics),
+                         set(['scraper_lastsuccessfulcollection',
+                              'scraper_lastcollectionattempt',
+                              'scraper_maxrawfiletimearchived']))
+        for metric in metrics:
+            # spot-check one of the metrics
+            if metric.name == 'scraper_maxrawfiletimearchived':
+                self.assertEqual(set(x[2] for x in metric.samples),
+                                 set([1490746201L, 1490746202L]))
+        self.assertIn('ERROR', [x.levelname for x in log.records])
+
+    def test_deconstruct_rsync_url(self):
+        self.assertEqual(
+            sync.deconstruct_rsync_url(
+                'rsync://utility.mlab.mlab4.prg01.measurement-lab.org:7999'
+                '/utilization'),
+            ('utility.mlab', 'mlab4.prg01.measurement-lab.org', 'utilization'))
+        self.assertEqual(
+            sync.deconstruct_rsync_url(
+                'rsync://utility.mlab.BAD.prg01.measurement-lab.org:7999'
+                '/utilization'),
+            None)
 
 
 if __name__ == '__main__':  # pragma: no cover
