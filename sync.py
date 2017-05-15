@@ -40,6 +40,7 @@ import BaseHTTPServer
 import datetime
 import logging
 import random
+import re
 import SocketServer
 import sys
 import textwrap
@@ -342,6 +343,20 @@ def parse_xdatetime(xdatetime):
         return None
 
 
+def deconstruct_rsync_url(rsync_url):
+    """Turns an rsync url into experiment, machine, and rsync_module parts.
+
+    Returns None if the rsync_url does not conform to the required spec.
+    """
+    parts = re.compile(
+        r'rsync://(.*)\.(mlab\d.[a-z]{3}\d[\dt]\.measurement-lab.org):\d*/(.*)')
+    match = parts.match(rsync_url)
+    if match is None:
+        return None
+    else:
+        return match.group(1), match.group(2), match.group(3)
+
+
 class PrometheusDatastoreCollector(object):
     """A collector to forward the contents of cloud datastore to prometheus."""
 
@@ -353,30 +368,34 @@ class PrometheusDatastoreCollector(object):
         last_success = prometheus_client.core.GaugeMetricFamily(
             'scraper_lastsuccessfulcollection',
             'Time of the last successful collection',
-            labels=['rsync_url'])
+            labels=['experiment', 'machine', 'rsync_module'])
         last_attempt = prometheus_client.core.GaugeMetricFamily(
             'scraper_lastcollectionattempt',
             'Time of the last collection attempt',
-            labels=['rsync_url'])
+            labels=['experiment', 'machine', 'rsync_module'])
         max_filetime = prometheus_client.core.GaugeMetricFamily(
             'scraper_maxrawfiletimearchived',
             'Time before which files may be deleted',
-            labels=['rsync_url'])
+            labels=['experiment', 'machine', 'rsync_module'])
         data = get_fleet_data(self.namespace)
         for fact in data:
             rsync_url = fact['dropboxrsyncaddress']
+            labels = deconstruct_rsync_url(rsync_url)
+            if labels is None:
+                logging.error('Bad rsync url: %s', rsync_url)
+                continue
             if 'lastsuccessfulcollection' in fact:
                 timestamp = parse_xdatetime(fact['lastsuccessfulcollection'])
                 if timestamp is not None:
-                    last_success.add_metric([rsync_url], timestamp)
+                    last_success.add_metric(labels, timestamp)
             if 'lastcollectionattempt' in fact:
                 timestamp = parse_xdatetime(fact['lastcollectionattempt'])
                 if timestamp is not None:
-                    last_attempt.add_metric([rsync_url], timestamp)
+                    last_attempt.add_metric(labels, timestamp)
             if 'maxrawfilemtimearchived' in fact:
                 try:
                     timestamp = int(fact['maxrawfilemtimearchived'])
-                    max_filetime.add_metric([rsync_url], timestamp)
+                    max_filetime.add_metric(labels, timestamp)
                 except ValueError:
                     pass
         yield last_success
