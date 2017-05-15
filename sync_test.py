@@ -317,6 +317,11 @@ class TestSync(unittest.TestCase):
                 'rsync://utility.mlab.BAD.prg01.measurement-lab.org:7999'
                 '/utilization'),
             None)
+        self.assertEqual(
+            sync.deconstruct_rsync_url(
+                'rsync://utility.mlab.mlab4.nuq0t.measurement-lab.org:7999'
+                '/utilization'),
+            ('utility.mlab', 'mlab4.nuq0t.measurement-lab.org', 'utilization'))
 
 
 if __name__ == '__main__':  # pragma: no cover

@@ -349,7 +349,7 @@ def deconstruct_rsync_url(rsync_url):
     Returns None if the rsync_url does not conform to the required spec.
     """
     parts = re.compile(
-        r'rsync://(.*)\.(mlab\d.[a-z]{3}\d\d\.measurement-lab.org):\d*/(.*)')
+        r'rsync://(.*)\.(mlab\d.[a-z]{3}\d[\dt]\.measurement-lab.org):\d*/(.*)')
     match = parts.match(rsync_url)
     if match is None:
         return None
