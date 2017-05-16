@@ -4,11 +4,8 @@ cache:
   directories:
     - "$HOME/google-cloud-sdk/"
 python: "2.7"
-sudo: required
 dist: trusty
 install:
-  - sudo apt-get -qq update
-  - sudo apt-get install -y nocache
   - pip install -r requirements.txt
   - pip install -r test-requirements.txt
   - pip install coveralls
