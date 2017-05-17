@@ -13,7 +13,7 @@ spec:
         prometheus.io/port: '9090'
       name: scraper-sync
       labels:
-        app: scraper-sync
+        service: scraper-sync
     spec:
       containers:
         - name: scraper-sync
