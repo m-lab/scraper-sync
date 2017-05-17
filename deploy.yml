@@ -3,7 +3,7 @@ apiVersion: extensions/v1beta1
 metadata:
   name: scraper-sync
   labels:
-    app: scraper-sync
+    service: scraper-sync
 spec:
   replicas: 1
   template:
