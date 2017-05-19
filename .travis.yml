@@ -18,7 +18,12 @@ after_success:
 deploy:
 - provider: script
   script:
-  - build  # Build Docker image
-  - upload # Upload it to gcr.io
-  - create the deploy.yml file from template  #
-  - deploy # kubectl apply -f ...
+  - cd $TRAVIS_BUILD_DIR && mkdir deployment && cp deploy.yml deployment/
+  - cd $TRAVIS_BUILD_DIR && ./travis/build_and_deploy_container.sh ${TRAVIS_COMMIT}
+       gcr.io/mlab-staging/github-m-lab-scraper mlab-staging scraper-cluster us-central1-a
+       SPREADSHEET_ID 143pU25GJidW2KZ_93hgzHdqTqq22wgdxR_3tt3dvrJY
+       NAMESPACE scraper
+       GITHUB_COMMIT http://github.com/${TRAVIS_REPO_SLUG}/tree/${TRAVIS_COMMIT}
+  on:
+    repo: m-lab/scraper-sync
+    branch: staging

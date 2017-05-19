@@ -11,15 +11,16 @@ spec:
       annotations:
         prometheus.io/scrape: 'true'
         prometheus.io/port: '9090'
+        source: '{{GITHUB_COMMIT}}'
       name: scraper-sync
       labels:
         app: scraper-sync
     spec:
       containers:
         - name: scraper-sync
-          image: # Travis or the human doing this by hand should fill this in
+          image: '{{IMAGE_URL}}'
           env:
             - name: NAMESPACE
-              value: scraper
+              value: '{{NAMESPACE}}'
             - name: SPREADSHEET
-              value: #Travis or the human doing this should fill this in by hand
+              value: '{{SPREADSHEET_ID}}'
