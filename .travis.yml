@@ -16,7 +16,8 @@ after_success: coveralls
 deploy:
 - provider: script
   script:
-  - cd $TRAVIS_BUILD_DIR && mkdir deployment && cp deploy.yml deployment/ &&
+  - gcloud auth activate-service-account --key-file /tmp/staging-secret-key.json &&
+    cd $TRAVIS_BUILD_DIR && mkdir deployment && cp deploy.yml deployment/ &&
     sudo ./travis/build_and_deploy_container.sh ${TRAVIS_COMMIT}
     gcr.io/mlab-staging/github-m-lab-scraper mlab-staging scraper-cluster us-central1-a
     SPREADSHEET_ID 143pU25GJidW2KZ_93hgzHdqTqq22wgdxR_3tt3dvrJY
