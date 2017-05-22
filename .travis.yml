@@ -12,20 +12,13 @@ install:
 - pip install -r requirements.txt
 - pip install -r test-requirements.txt
 - pip install coveralls
-- $TRAVIS_BUILD_DIR/travis/install_gcloud.sh && yes | gcloud components install kubectl
+- $TRAVIS_BUILD_DIR/travis/install_gcloud.sh
+- yes | ${HOME}/google-cloud-sdk/bin/gcloud components install kubectl
 script: coverage run --source='.' -m unittest discover --pattern='*_test.py'
 after_success: coveralls
 deploy:
 - provider: script
-  script:
-  - gcloud auth activate-service-account --key-file /tmp/staging-secret-key.json &&
-    ssh-keygen -f ~/.ssh/google_compute_engine -N "" &&
-    cd $TRAVIS_BUILD_DIR && mkdir deployment && cp deploy.yml deployment/ &&
-    ./travis/build_and_deploy_container.sh ${TRAVIS_COMMIT}
-    gcr.io/mlab-staging/github-m-lab-scraper mlab-staging scraper-cluster us-central1-a
-    SPREADSHEET_ID 143pU25GJidW2KZ_93hgzHdqTqq22wgdxR_3tt3dvrJY
-    NAMESPACE scraper
-    GITHUB_COMMIT http://github.com/${TRAVIS_REPO_SLUG}/tree/${TRAVIS_COMMIT}
+  script: ./deploy.sh staging
   on:
     repo: m-lab/scraper-sync
     branch: staging
