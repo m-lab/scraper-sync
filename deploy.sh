@@ -8,6 +8,7 @@ source "${HOME}/google-cloud-sdk/path.bash.inc"
 ssh-keygen -f ~/.ssh/google_compute_engine -N ""
 cd $TRAVIS_BUILD_DIR
 mkdir deployment
+cp deploy.yml deployment
 if [[ "$1" = staging ]]
 then
   gcloud auth activate-service-account --key-file /tmp/staging-secret-key.json
