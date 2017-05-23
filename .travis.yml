@@ -12,11 +12,16 @@ install:
 - pip install -r requirements.txt
 - pip install -r test-requirements.txt
 - pip install coveralls
-- $TRAVIS_BUILD_DIR/travis/install_gcloud.sh
-- yes | ${HOME}/google-cloud-sdk/bin/gcloud components install kubectl
+- $TRAVIS_BUILD_DIR/travis/install_gcloud.sh kubectl
 script: coverage run --source='.' -m unittest discover --pattern='*_test.py'
 after_success: coveralls
 deploy:
+- provider: script
+  script: ./deploy.sh $TRAVIS_BRANCH
+  on:
+    repo: m-lab/scraper-sync
+    all_branches: true
+    condition: $TRAVIS_BRANCH == sandbox-*
 - provider: script
   script: ./deploy.sh staging
   on:
@@ -24,7 +29,5 @@ deploy:
     branch: staging
 
 before_install:
-- if [[ -n "$encrypted_a3d09b9fe230_iv" ]]; then
-  travis/decrypt.sh "$encrypted_a3d09b9fe230_iv" "$encrypted_a3d09b9fe230_key"
+- travis/decrypt.sh "$encrypted_a3d09b9fe230_key" "$encrypted_a3d09b9fe230_iv"
   keys/credentials.tar.gz.enc /tmp/credentials.tar /tmp;
-  fi
