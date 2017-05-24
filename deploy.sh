@@ -32,6 +32,7 @@ fi
 if [[ "$1" == production ]]; then
   KEY_FILE=/tmp/production-secret-key.json
   PROJECT=mlab-oti
+  # TODO(dev): create independent sheets for each project
   SHEET_ID=143pU25GJidW2KZ_93hgzHdqTqq22wgdxR_3tt3dvrJY
   NAMESPACE=scraper
   CLUSTER=scraper-cluster
@@ -44,13 +45,20 @@ elif [[ "$1" == staging ]]; then
   CLUSTER=scraper-cluster
   ZONE=us-central1-a
 elif [[ "$1" == sandbox-* ]]; then
+  # The branch sandbox-pboothe will use the namespace scraper-pboothe, and will
+  # deploy to the cluster scraper-cluster-pboothe.
   SANDBOXSUFFIX=$(echo "$1" | sed -e 's/^sandbox-//')
   [[ -n "${SANDBOXSUFFIX}" ]] || exit 1
   KEY_FILE=/tmp/sandbox-secret-key.json
   PROJECT=mlab-sandbox
   SHEET_ID=143pU25GJidW2KZ_93hgzHdqTqq22wgdxR_3tt3dvrJY
+  # NAMESPACE must be unique to a cluster (within the same project), so in
+  # expectation that there might be multiple clusters running in sandbox, we add
+  # the suffix to NAMESPACE.
   NAMESPACE=scraper-${SANDBOXSUFFIX}
-  CLUSTER=${SANDBOXSUFFIX}-scraper-cluster
+  # Because there may be multiple clusters in sandbox, we use the branch name to
+  # choose one.
+  CLUSTER=scraper-cluster-${SANDBOXSUFFIX}
   ZONE=us-central1-a
 else
   echo "BAD ARGUMENT TO $0"
@@ -69,17 +77,21 @@ if [[ $2 == travis ]]; then
   gcloud auth activate-service-account --key-file ${KEY_FILE}
 fi
 
+# Configure the last pieces of deploy.yml
 ./travis/substitute_values.sh deployment \
   IMAGE_URL gcr.io/${PROJECT}/github-m-lab-scraper-sync:${GIT_COMMIT} \
   SPREADSHEET_ID ${SHEET_ID} \
   NAMESPACE ${NAMESPACE} \
   GITHUB_COMMIT http://github.com/m-lab/scraper-sync/tree/${GIT_COMMIT}
 
+# Build the image and push it to GCR
 ./travis/build_and_push_container.sh \
   gcr.io/${PROJECT}/github-m-lab-scraper-sync:${GIT_COMMIT} \
   ${PROJECT}
 
+# Make sure that the kubectl command is associated with the right cluster
 gcloud --project=${PROJECT} \
   container clusters get-credentials ${CLUSTER} --zone=${ZONE}
 
+# Apply the config in the deployment/ directory to the cluster
 kubectl apply -f deployment/
