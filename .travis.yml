@@ -17,13 +17,13 @@ script: coverage run --source='.' -m unittest discover --pattern='*_test.py'
 after_success: coveralls
 deploy:
 - provider: script
-  script: $HOME/google-cloud-sdk/bin/gcloud auth activate-service-account --key-file /tmp/sandbox-secret-key.json && cd $TRAVIS_BUILD_DIR && ./deploy.sh $TRAVIS_BRANCH
+  script: deploy.sh $TRAVIS_BRANCH travis
   on:
     repo: m-lab/scraper-sync
     all_branches: true
     condition: $TRAVIS_BRANCH == sandbox-*
 - provider: script
-  script: $HOME/google-cloud-sdk/bin/gcloud auth activate-service-account --key-file /tmp/staging-secret-key.json && cd $TRAVIS_BUILD_DIR && ./deploy.sh staging
+  script: deploy.sh staging travis
   on:
     repo: m-lab/scraper-sync
     branch: staging
