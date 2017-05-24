@@ -34,14 +34,14 @@ if [[ "$1" == production ]]; then
   PROJECT=mlab-oti
   # TODO(dev): create independent sheets for each project
   SHEET_ID=143pU25GJidW2KZ_93hgzHdqTqq22wgdxR_3tt3dvrJY
-  NAMESPACE=scraper
+  DATASTORE_NAMESPACE=scraper
   CLUSTER=scraper-cluster
   ZONE=us-central1-a
 elif [[ "$1" == staging ]]; then
   KEY_FILE=/tmp/staging-secret-key.json
   PROJECT=mlab-staging
   SHEET_ID=143pU25GJidW2KZ_93hgzHdqTqq22wgdxR_3tt3dvrJY
-  NAMESPACE=scraper
+  DATASTORE_NAMESPACE=scraper
   CLUSTER=scraper-cluster
   ZONE=us-central1-a
 elif [[ "$1" == sandbox-* ]]; then
@@ -52,10 +52,10 @@ elif [[ "$1" == sandbox-* ]]; then
   KEY_FILE=/tmp/sandbox-secret-key.json
   PROJECT=mlab-sandbox
   SHEET_ID=143pU25GJidW2KZ_93hgzHdqTqq22wgdxR_3tt3dvrJY
-  # NAMESPACE must be unique to a cluster (within the same project), so in
+  # DATASTORE_NAMESPACE must be unique to a cluster (within the same project), so in
   # expectation that there might be multiple clusters running in sandbox, we add
-  # the suffix to NAMESPACE.
-  NAMESPACE=scraper-${SANDBOXSUFFIX}
+  # the suffix to make it unique.
+  DATASTORE_NAMESPACE=scraper-${SANDBOXSUFFIX}
   # Because there may be multiple clusters in sandbox, we use the branch name to
   # choose one.
   CLUSTER=scraper-cluster-${SANDBOXSUFFIX}
@@ -81,7 +81,7 @@ fi
 ./travis/substitute_values.sh deployment \
   IMAGE_URL gcr.io/${PROJECT}/github-m-lab-scraper-sync:${GIT_COMMIT} \
   SPREADSHEET_ID ${SHEET_ID} \
-  NAMESPACE ${NAMESPACE} \
+  DATASTORE_NAMESPACE ${NAMESPACE} \
   GITHUB_COMMIT http://github.com/m-lab/scraper-sync/tree/${GIT_COMMIT}
 
 # Build the image and push it to GCR
