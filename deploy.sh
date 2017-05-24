@@ -81,7 +81,7 @@ fi
 ./travis/substitute_values.sh deployment \
   IMAGE_URL gcr.io/${PROJECT}/github-m-lab-scraper-sync:${GIT_COMMIT} \
   SPREADSHEET_ID ${SHEET_ID} \
-  DATASTORE_NAMESPACE ${NAMESPACE} \
+  NAMESPACE ${DATASTORE_NAMESPACE} \
   GITHUB_COMMIT http://github.com/m-lab/scraper-sync/tree/${GIT_COMMIT}
 
 # Build the image and push it to GCR
