@@ -16,6 +16,9 @@ spec:
       labels:
         app: scraper-sync
     spec:
+      # Scraper nodes have sheets permission scopes
+      nodeSelector:
+        scraper-node: 'true'
       containers:
         - name: scraper-sync
           image: '{{IMAGE_URL}}'
