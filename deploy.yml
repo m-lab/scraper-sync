@@ -10,7 +10,6 @@ spec:
     metadata:
       annotations:
         prometheus.io/scrape: 'true'
-        prometheus.io/port: '9090'
         source: '{{GITHUB_COMMIT}}'
       name: scraper-sync
       labels:
@@ -27,3 +26,5 @@ spec:
               value: '{{NAMESPACE}}'
             - name: SPREADSHEET
               value: '{{SPREADSHEET_ID}}'
+          ports:
+            - containerPort: 9090
