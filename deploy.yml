@@ -3,7 +3,7 @@ apiVersion: extensions/v1beta1
 metadata:
   name: scraper-sync
   labels:
-    service: scraper-sync
+    application: scraper-sync
 spec:
   replicas: 1
   template:
@@ -13,7 +13,7 @@ spec:
         source: '{{GITHUB_COMMIT}}'
       name: scraper-sync
       labels:
-        service: scraper-sync
+        application: scraper-sync
     spec:
       # Scraper nodes have sheets permission scopes
       nodeSelector:
