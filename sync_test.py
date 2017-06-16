@@ -293,6 +293,14 @@ class TestSync(unittest.TestCase):
             TestSync.FakeEntity(u'rsync://badbad', {}))
         mock_client.query().fetch.return_value = self.test_datastore_data
 
+        rsync_urls_with_bad_value_added = set([
+            u'rsync://badbad',
+        ]).union(sync.get_currently_deployed_rsync_urls())
+
+        patcher = mock.patch('sync.get_currently_deployed_rsync_urls')
+        mock_rsync_urls = patcher.start()
+        mock_rsync_urls.return_value = rsync_urls_with_bad_value_added
+
         collector = sync.PrometheusDatastoreCollector('test_namespace')
         metrics = list(collector.collect())
         self.assertEqual(set(x.name for x in metrics),
@@ -305,6 +313,31 @@ class TestSync(unittest.TestCase):
                 self.assertEqual(set(x[2] for x in metric.samples),
                                  set([1490746201L, 1490746202L]))
         self.assertIn('ERROR', [x.levelname for x in log.records])
+
+    @mock.patch.object(sync, 'datastore')
+    @testfixtures.log_capture()
+    def test_prometheus_forwarding_and_retired_sites(self, mock_datastore):
+        mock_client = mock.Mock()
+        mock_datastore.Client.return_value = mock_client
+        self.test_datastore_data.append(
+            TestSync.FakeEntity(
+                u'rsync://ndt.iupui.lhr01.measurement-lab.org:7999/ndt',
+                {u'lastsuccessfulcollection': 'x2017-03-28',
+                 u'errorsincelastsuccessful': '',
+                 u'lastcollectionattempt': 'x2017-03-29-21:22',
+                 u'maxrawfilemtimearchived': 1490746201L}))
+        mock_client.query().fetch.return_value = self.test_datastore_data
+
+        collector = sync.PrometheusDatastoreCollector('test_namespace')
+        metrics = list(collector.collect())
+        self.assertEqual(set(x.name for x in metrics),
+                         set(['scraper_lastsuccessfulcollection',
+                              'scraper_lastcollectionattempt',
+                              'scraper_maxrawfiletimearchived']))
+        for metric in metrics:
+            for sample in metric.samples:
+                self.assertNotEqual(sample[1]['machine'],
+                                    'lhr01.measurement-lab.org')
 
     def test_deconstruct_rsync_url(self):
         self.assertEqual(
@@ -322,6 +355,11 @@ class TestSync(unittest.TestCase):
                 'rsync://utility.mlab.mlab4.nuq0t.measurement-lab.org:7999'
                 '/utilization'),
             ('utility.mlab', 'mlab4.nuq0t.measurement-lab.org', 'utilization'))
+
+    def test_get_currently_deployed_rsync_urls(self):
+        self.assertIn('rsync://utility.mlab.mlab4.nuq0t.measurement-lab.org'
+                      ':7999/utilization',
+                      sync.get_currently_deployed_rsync_urls())
 
 
 if __name__ == '__main__':  # pragma: no cover

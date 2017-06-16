@@ -357,6 +357,52 @@ def deconstruct_rsync_url(rsync_url):
         return match.group(1), match.group(2), match.group(3)
 
 
+def cached(func):
+    """A decorator that caches a function.
+
+    Should be part of the stdlib, and actually is part of it in Python 3+.
+    """
+    cache = {}
+
+    def cached_func(*args):
+        """A cached version of the passed-in function."""
+        if None not in cache:
+            cache[None] = func(*args)
+        return cache[None]
+    return cached_func
+
+
+@cached
+def get_currently_deployed_rsync_urls():
+    """Get a set of deployed rsync urls.
+
+    The return value of this function should never change over the lifetime of a
+    program's execution, so we cache it.
+    """
+    # Operator has no __init__.py, and as such can't be in the import path.
+    # pylint: disable=import-error
+    sys.path.append('./operator/')
+    import plsync.slices
+    import plsync.sites
+    # pylint: enable=import-error
+    # Assign every slice to every node.
+    for experiment in plsync.slices.slice_list:
+        for site in plsync.sites.site_list:
+            for _hostname, node in site['nodes'].iteritems():
+                experiment.add_node_address(node)
+    # Extract every rsync_url
+    rsync_urls = []
+    for experiment in plsync.slices.slice_list:
+        for _name, node in experiment['network_list']:
+            if experiment['index'] is None:
+                continue
+            rsync_host = experiment.hostname(node)
+            for rsync_module in experiment['rsync_modules']:
+                url = 'rsync://' + rsync_host + ':7999/' + rsync_module
+                rsync_urls.append(url)
+    return set(rsync_urls)
+
+
 class PrometheusDatastoreCollector(object):
     """A collector to forward the contents of cloud datastore to prometheus."""
 
@@ -377,7 +423,9 @@ class PrometheusDatastoreCollector(object):
             'scraper_maxrawfiletimearchived',
             'Time before which files may be deleted',
             labels=['experiment', 'machine', 'rsync_module'])
-        data = get_fleet_data(self.namespace)
+        rsync_urls = get_currently_deployed_rsync_urls()
+        data = [x for x in get_fleet_data(self.namespace)
+                if x['dropboxrsyncaddress'] in rsync_urls]
         for fact in data:
             rsync_url = fact['dropboxrsyncaddress']
             labels = deconstruct_rsync_url(rsync_url)
