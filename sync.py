@@ -120,6 +120,11 @@ def parse_args(argv):
         default='scraper',
         help='The cloud datastore namespace to use in the current project.')
     parser.add_argument(
+        '--node_patterns_file',
+        metavar='FILENAME',
+        type=str,
+        help='The file full of node patterns to export to prometheus')
+    parser.add_argument(
         '--prometheus_port',
         metavar='PORT',
         type=int,
@@ -366,14 +371,14 @@ def cached(func):
 
     def cached_func(*args):
         """A cached version of the passed-in function."""
-        if None not in cache:
-            cache[None] = func(*args)
-        return cache[None]
+        if args not in cache:
+            cache[args] = func(*args)
+        return cache[args]
     return cached_func
 
 
 @cached
-def get_currently_deployed_rsync_urls():
+def get_currently_deployed_rsync_urls(pattern_file):
     """Get a set of deployed rsync urls.
 
     The return value of this function should never change over the lifetime of a
@@ -384,6 +389,7 @@ def get_currently_deployed_rsync_urls():
     sys.path.append('./operator/')
     import plsync.slices
     import plsync.sites
+    sys.path.pop()
     # pylint: enable=import-error
     # Assign every slice to every node.
     for experiment in plsync.slices.slice_list:
@@ -400,14 +406,22 @@ def get_currently_deployed_rsync_urls():
             for rsync_module in experiment['rsync_modules']:
                 url = 'rsync://' + rsync_host + ':7999/' + rsync_module
                 rsync_urls.append(url)
-    return set(rsync_urls)
+    # Only export the rsync_urls that match at least one pattern in the
+    # pattern_file.
+    filtered_rsync_urls = []
+    for pattern in open(pattern_file, 'r'):
+        regexp = re.compile(pattern.strip())
+        filtered_rsync_urls.extend(filter(regexp.search, rsync_urls))
+    # Return a set to ensure that no url is in the list twice.
+    return set(filtered_rsync_urls)
 
 
 class PrometheusDatastoreCollector(object):
     """A collector to forward the contents of cloud datastore to prometheus."""
 
-    def __init__(self, namespace):
+    def __init__(self, namespace, pattern_file):
         self.namespace = namespace
+        self.pattern_file = pattern_file
 
     def collect(self):
         """Get the data from cloud datastore and yield a series of metrics."""
@@ -423,7 +437,7 @@ class PrometheusDatastoreCollector(object):
             'scraper_maxrawfiletimearchived',
             'Time before which files may be deleted',
             labels=['experiment', 'machine', 'rsync_module'])
-        rsync_urls = get_currently_deployed_rsync_urls()
+        rsync_urls = get_currently_deployed_rsync_urls(self.pattern_file)
         data = [x for x in get_fleet_data(self.namespace)
                 if x['dropboxrsyncaddress'] in rsync_urls]
         for fact in data:
@@ -476,7 +490,8 @@ def main(argv):  # pragma: no cover
     spreadsheet = Spreadsheet(sheets_service, args.spreadsheet)
     # Set up the prometheus sync job
     prometheus_client.core.REGISTRY.register(
-        PrometheusDatastoreCollector(args.datastore_namespace))
+        PrometheusDatastoreCollector(args.datastore_namespace,
+                                     args.node_patterns_file))
     # Set up the monitoring
     prometheus_client.start_http_server(args.prometheus_port)
     start_webserver_in_new_thread(args.webserver_port)
