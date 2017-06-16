@@ -85,7 +85,8 @@ fi
   IMAGE_URL gcr.io/${PROJECT}/github-m-lab-scraper-sync:${GIT_COMMIT} \
   SPREADSHEET_ID ${SHEET_ID} \
   NAMESPACE ${DATASTORE_NAMESPACE} \
-  GITHUB_COMMIT http://github.com/m-lab/scraper-sync/tree/${GIT_COMMIT}
+  GITHUB_COMMIT http://github.com/m-lab/scraper-sync/tree/${GIT_COMMIT} \
+  NODE_PATTERN_FILE ${NODE_PATTERN_FILE}
 
 # Build the image and push it to GCR
 ./travis/build_and_push_container.sh \
