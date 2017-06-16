@@ -26,5 +26,7 @@ spec:
               value: '{{NAMESPACE}}'
             - name: SPREADSHEET
               value: '{{SPREADSHEET_ID}}'
+            - name: NODE_PATTERN_FILE
+              value: '{{NODE_PATTERN_FILE}}'
           ports:
             - containerPort: 9090

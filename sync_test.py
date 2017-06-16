@@ -267,7 +267,8 @@ class TestSync(unittest.TestCase):
         mock_datastore.Client.return_value = mock_client
         mock_client.query().fetch.return_value = self.test_datastore_data
 
-        collector = sync.PrometheusDatastoreCollector('test_namespace')
+        collector = sync.PrometheusDatastoreCollector(
+            'test_namespace', 'operator/plsync/staging_patterns.txt')
         metrics = list(collector.collect())
         self.assertEqual(set(x.name for x in metrics),
                          set(['scraper_lastsuccessfulcollection',
@@ -287,13 +288,30 @@ class TestSync(unittest.TestCase):
     @mock.patch.object(sync, 'datastore')
     @testfixtures.log_capture()
     def test_prometheus_forwarding_with_bad_data(self, mock_datastore, log):
+        # Put a bad value in the datastore.
         mock_client = mock.Mock()
         mock_datastore.Client.return_value = mock_client
         self.test_datastore_data.append(
             TestSync.FakeEntity(u'rsync://badbad', {}))
         mock_client.query().fetch.return_value = self.test_datastore_data
 
-        collector = sync.PrometheusDatastoreCollector('test_namespace')
+        # Add a bad value to all of the good values returned by
+        # get_currently_deployed_rsync_urls().
+        rsync_urls_with_bad_value_added = set([
+            u'rsync://badbad',
+        ]).union(sync.get_currently_deployed_rsync_urls(
+            'operator/plsync/staging_patterns.txt'))
+
+        # Make get_currently_deployed_rsync_urls() return the set with the bad
+        # value.
+        patcher = mock.patch('sync.get_currently_deployed_rsync_urls')
+        mock_rsync_urls = patcher.start()
+        mock_rsync_urls.return_value = rsync_urls_with_bad_value_added
+
+        # Verify that having a bad value in the system doesn't crash the
+        # collector.
+        collector = sync.PrometheusDatastoreCollector(
+            'test_namespace', 'operator/plsync/staging_patterns.txt')
         metrics = list(collector.collect())
         self.assertEqual(set(x.name for x in metrics),
                          set(['scraper_lastsuccessfulcollection',
@@ -305,6 +323,34 @@ class TestSync(unittest.TestCase):
                 self.assertEqual(set(x[2] for x in metric.samples),
                                  set([1490746201L, 1490746202L]))
         self.assertIn('ERROR', [x.levelname for x in log.records])
+
+    @mock.patch.object(sync, 'datastore')
+    @testfixtures.log_capture()
+    def test_prometheus_forwarding_and_retired_sites(self, mock_datastore):
+        # Add a datastore entry for a site that should no longer be published.
+        # Then confirm that it is filtered from exported metrics.
+        mock_client = mock.Mock()
+        mock_datastore.Client.return_value = mock_client
+        self.test_datastore_data.append(
+            TestSync.FakeEntity(
+                u'rsync://ndt.iupui.mlab4.lhr01.measurement-lab.org:7999/ndt',
+                {u'lastsuccessfulcollection': 'x2017-03-28',
+                 u'errorsincelastsuccessful': '',
+                 u'lastcollectionattempt': 'x2017-03-29-21:22',
+                 u'maxrawfilemtimearchived': 1490746201L}))
+        mock_client.query().fetch.return_value = self.test_datastore_data
+
+        collector = sync.PrometheusDatastoreCollector(
+            'test_namespace', 'operator/plsync/staging_patterns.txt')
+        metrics = list(collector.collect())
+        self.assertEqual(set(x.name for x in metrics),
+                         set(['scraper_lastsuccessfulcollection',
+                              'scraper_lastcollectionattempt',
+                              'scraper_maxrawfiletimearchived']))
+        for metric in metrics:
+            for sample in metric.samples:
+                self.assertNotEqual(sample[1]['machine'],
+                                    'lhr01.measurement-lab.org')
 
     def test_deconstruct_rsync_url(self):
         self.assertEqual(
@@ -322,6 +368,35 @@ class TestSync(unittest.TestCase):
                 'rsync://utility.mlab.mlab4.nuq0t.measurement-lab.org:7999'
                 '/utilization'),
             ('utility.mlab', 'mlab4.nuq0t.measurement-lab.org', 'utilization'))
+
+    def test_get_currently_deployed_rsync_urls(self):
+        self.assertIn('rsync://utility.mlab.mlab3.atl06.measurement-lab.org'
+                      ':7999/utilization',
+                      sync.get_currently_deployed_rsync_urls(
+                          'operator/plsync/production_patterns.txt'))
+        self.assertNotIn('rsync://utility.mlab.mlab4.atl06.measurement-lab.org'
+                         ':7999/utilization',
+                         sync.get_currently_deployed_rsync_urls(
+                             'operator/plsync/production_patterns.txt'))
+        self.assertIn('rsync://utility.mlab.mlab4.atl05.measurement-lab.org'
+                      ':7999/utilization',
+                      sync.get_currently_deployed_rsync_urls(
+                          'operator/plsync/staging_patterns.txt'))
+
+    def test_cached(self):
+        args = []
+
+        @sync.cached
+        def should_be_only_run_once_per_arg(arg):
+            args.append(arg)
+            return len(args)
+
+        self.assertEqual(should_be_only_run_once_per_arg('hello'), 1)
+        self.assertEqual(['hello'], args)
+        self.assertEqual(should_be_only_run_once_per_arg('hello'), 1)
+        self.assertEqual(['hello'], args)
+        self.assertEqual(should_be_only_run_once_per_arg('bye'), 2)
+        self.assertEqual(['hello', 'bye'], args)
 
 
 if __name__ == '__main__':  # pragma: no cover

@@ -37,6 +37,7 @@ if [[ "$1" == production ]]; then
   DATASTORE_NAMESPACE=scraper
   CLUSTER=scraper-cluster
   ZONE=us-central1-a
+  NODE_PATTERN_FILE=operator/plsync/production_patterns.txt
 elif [[ "$1" == staging ]]; then
   KEY_FILE=/tmp/staging-secret-key.json
   PROJECT=mlab-staging
@@ -44,6 +45,7 @@ elif [[ "$1" == staging ]]; then
   DATASTORE_NAMESPACE=scraper
   CLUSTER=scraper-cluster
   ZONE=us-central1-a
+  NODE_PATTERN_FILE=operator/plsync/staging_patterns.txt
 elif [[ "$1" == sandbox-* ]]; then
   # The branch sandbox-pboothe will use the namespace scraper-pboothe, and will
   # deploy to the cluster scraper-cluster-pboothe.
@@ -60,6 +62,7 @@ elif [[ "$1" == sandbox-* ]]; then
   # choose one.
   CLUSTER=scraper-cluster-${SANDBOXSUFFIX}
   ZONE=us-central1-a
+  NODE_PATTERN_FILE=sandbox-nodes.txt
 else
   echo "BAD ARGUMENT TO $0"
   exit 1
@@ -82,7 +85,8 @@ fi
   IMAGE_URL gcr.io/${PROJECT}/github-m-lab-scraper-sync:${GIT_COMMIT} \
   SPREADSHEET_ID ${SHEET_ID} \
   NAMESPACE ${DATASTORE_NAMESPACE} \
-  GITHUB_COMMIT http://github.com/m-lab/scraper-sync/tree/${GIT_COMMIT}
+  GITHUB_COMMIT http://github.com/m-lab/scraper-sync/tree/${GIT_COMMIT} \
+  NODE_PATTERN_FILE ${NODE_PATTERN_FILE}
 
 # Build the image and push it to GCR
 ./travis/build_and_push_container.sh \

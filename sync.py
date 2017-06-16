@@ -120,6 +120,11 @@ def parse_args(argv):
         default='scraper',
         help='The cloud datastore namespace to use in the current project.')
     parser.add_argument(
+        '--node_patterns_file',
+        metavar='FILENAME',
+        type=str,
+        help='The file full of node patterns to export to prometheus')
+    parser.add_argument(
         '--prometheus_port',
         metavar='PORT',
         type=int,
@@ -357,11 +362,66 @@ def deconstruct_rsync_url(rsync_url):
         return match.group(1), match.group(2), match.group(3)
 
 
+def cached(func):
+    """A decorator that caches a function.
+
+    Should be part of the stdlib, and actually is part of it in Python 3+.
+    """
+    cache = {}
+
+    def cached_func(*args):
+        """A cached version of the passed-in function."""
+        if args not in cache:
+            cache[args] = func(*args)
+        return cache[args]
+    return cached_func
+
+
+@cached
+def get_currently_deployed_rsync_urls(pattern_file):
+    """Get a set of deployed rsync urls.
+
+    The return value of this function should never change over the lifetime of a
+    program's execution, so we cache it.
+    """
+    # Operator has no __init__.py, and as such can't be in the import path.
+    # pylint: disable=import-error
+    sys.path.append('./operator/')
+    import plsync.slices
+    import plsync.sites
+    sys.path.pop()
+    # pylint: enable=import-error
+    # Assign every slice to every node.
+    for experiment in plsync.slices.slice_list:
+        for site in plsync.sites.site_list:
+            for _hostname, node in site['nodes'].iteritems():
+                experiment.add_node_address(node)
+    # Extract every rsync_url
+    rsync_urls = []
+    for experiment in plsync.slices.slice_list:
+        for _name, node in experiment['network_list']:
+            if experiment['index'] is None:
+                continue
+            rsync_host = experiment.hostname(node)
+            for rsync_module in experiment['rsync_modules']:
+                url = 'rsync://' + rsync_host + ':7999/' + rsync_module
+                rsync_urls.append(url)
+    # Only export the rsync_urls that match at least one pattern in the
+    # pattern_file.
+    filtered_rsync_urls = []
+    for pattern in open(pattern_file, 'r'):
+        regexp = re.compile(pattern.strip())
+        filtered_rsync_urls.extend(filter(regexp.search, rsync_urls))
+    # Return a set to ensure that no url is in the list twice.
+    return set(filtered_rsync_urls)
+
+
 class PrometheusDatastoreCollector(object):
     """A collector to forward the contents of cloud datastore to prometheus."""
 
-    def __init__(self, namespace):
+    def __init__(self, namespace, pattern_file):
         self.namespace = namespace
+        self.pattern_file = pattern_file
 
     def collect(self):
         """Get the data from cloud datastore and yield a series of metrics."""
@@ -377,7 +437,9 @@ class PrometheusDatastoreCollector(object):
             'scraper_maxrawfiletimearchived',
             'Time before which files may be deleted',
             labels=['experiment', 'machine', 'rsync_module'])
-        data = get_fleet_data(self.namespace)
+        rsync_urls = get_currently_deployed_rsync_urls(self.pattern_file)
+        data = [x for x in get_fleet_data(self.namespace)
+                if x['dropboxrsyncaddress'] in rsync_urls]
         for fact in data:
             rsync_url = fact['dropboxrsyncaddress']
             labels = deconstruct_rsync_url(rsync_url)
@@ -428,7 +490,8 @@ def main(argv):  # pragma: no cover
     spreadsheet = Spreadsheet(sheets_service, args.spreadsheet)
     # Set up the prometheus sync job
     prometheus_client.core.REGISTRY.register(
-        PrometheusDatastoreCollector(args.datastore_namespace))
+        PrometheusDatastoreCollector(args.datastore_namespace,
+                                     args.node_patterns_file))
     # Set up the monitoring
     prometheus_client.start_http_server(args.prometheus_port)
     start_webserver_in_new_thread(args.webserver_port)

@@ -4,3 +4,6 @@
 [submodule "travis"]
 	path = travis
 	url = https://github.com/m-lab/travis
+[submodule "operator"]
+	path = operator
+	url = https://github.com/m-lab/operator.git
