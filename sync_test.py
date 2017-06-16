@@ -361,6 +361,19 @@ class TestSync(unittest.TestCase):
                       ':7999/utilization',
                       sync.get_currently_deployed_rsync_urls())
 
+    def test_cached(self):
+        args = []
+
+        @sync.cached
+        def should_be_only_run_once(arg):
+            args.append(arg)
+            return len(args)
+
+        self.assertEqual(should_be_only_run_once('hello'), 1)
+        self.assertEqual(['hello'], args)
+        self.assertEqual(should_be_only_run_once('hello'), 1)
+        self.assertEqual(['hello'], args)
+
 
 if __name__ == '__main__':  # pragma: no cover
     unittest.main()
