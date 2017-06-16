@@ -288,21 +288,28 @@ class TestSync(unittest.TestCase):
     @mock.patch.object(sync, 'datastore')
     @testfixtures.log_capture()
     def test_prometheus_forwarding_with_bad_data(self, mock_datastore, log):
+        # Put a bad value in the datastore.
         mock_client = mock.Mock()
         mock_datastore.Client.return_value = mock_client
         self.test_datastore_data.append(
             TestSync.FakeEntity(u'rsync://badbad', {}))
         mock_client.query().fetch.return_value = self.test_datastore_data
 
+        # Add a bad value to all of the good values returned by
+        # get_currently_deployed_rsync_urls().
         rsync_urls_with_bad_value_added = set([
             u'rsync://badbad',
         ]).union(sync.get_currently_deployed_rsync_urls(
             'operator/plsync/staging_patterns.txt'))
 
+        # Make get_currently_deployed_rsync_urls() return the set with the bad
+        # value.
         patcher = mock.patch('sync.get_currently_deployed_rsync_urls')
         mock_rsync_urls = patcher.start()
         mock_rsync_urls.return_value = rsync_urls_with_bad_value_added
 
+        # Verify that having a bad value in the system doesn't crash the
+        # collector.
         collector = sync.PrometheusDatastoreCollector(
             'test_namespace', 'operator/plsync/staging_patterns.txt')
         metrics = list(collector.collect())
@@ -320,6 +327,8 @@ class TestSync(unittest.TestCase):
     @mock.patch.object(sync, 'datastore')
     @testfixtures.log_capture()
     def test_prometheus_forwarding_and_retired_sites(self, mock_datastore):
+        # Add a datastore entry for a site that should no longer be published.
+        # Then confirm that it is filtered from exported metrics.
         mock_client = mock.Mock()
         mock_datastore.Client.return_value = mock_client
         self.test_datastore_data.append(
