@@ -17,4 +17,4 @@ EXPOSE 80
 CMD /sync.py \
     --datastore_namespace=$NAMESPACE \
     --spreadsheet=$SPREADSHEET \
-    --node-pattern-file=$NODE_PATTERN_FILE
+    --node_pattern_file=$NODE_PATTERN_FILE
