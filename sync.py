@@ -120,7 +120,7 @@ def parse_args(argv):
         default='scraper',
         help='The cloud datastore namespace to use in the current project.')
     parser.add_argument(
-        '--node_patterns_file',
+        '--node_pattern_file',
         metavar='FILENAME',
         type=str,
         help='The file full of node patterns to export to prometheus')
