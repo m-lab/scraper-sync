@@ -1,7 +1,7 @@
 FROM google/cloud-sdk
 MAINTAINER Peter Boothe <pboothe@google.com>
 # Install all the standard packages we need
-RUN apt-get -q update && apt-get install -q -y python-dev python-pip
+RUN apk --no-cache add python-dev py2-pip gcc musl-dev
 # Install all the python requirements
 ADD requirements.txt /requirements.txt
 RUN pip install -q -r requirements.txt
