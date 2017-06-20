@@ -491,7 +491,7 @@ def main(argv):  # pragma: no cover
     # Set up the prometheus sync job
     prometheus_client.core.REGISTRY.register(
         PrometheusDatastoreCollector(args.datastore_namespace,
-                                     args.node_patterns_file))
+                                     args.node_pattern_file))
     # Set up the monitoring
     prometheus_client.start_http_server(args.prometheus_port)
     start_webserver_in_new_thread(args.webserver_port)
