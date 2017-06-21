@@ -39,7 +39,6 @@ import argparse
 import BaseHTTPServer
 import datetime
 import logging
-import os
 import random
 import re
 import SocketServer
@@ -124,8 +123,7 @@ def parse_args(argv):
         '--node_pattern_file',
         metavar='FILENAMES',
         type=str,
-        nargs='+',
-        help='Space-separated list of files containing node patterns to export '
+        help='Comma-separated list of files full of node patterns to export '
              'to prometheus')
     parser.add_argument(
         '--prometheus_port',
@@ -412,7 +410,6 @@ def get_currently_deployed_rsync_urls(pattern_file):
     # Only export the rsync_urls that match at least one pattern in the
     # pattern_file.
     filtered_rsync_urls = []
-    assert os.path.exists(pattern_file), 'Bad filename: %s' % pattern_file
     for pattern in open(pattern_file, 'r'):
         regexp = re.compile(pattern.strip())
         filtered_rsync_urls.extend(filter(regexp.search, rsync_urls))
@@ -423,10 +420,11 @@ def get_currently_deployed_rsync_urls(pattern_file):
 class PrometheusDatastoreCollector(object):
     """A collector to forward the contents of cloud datastore to prometheus."""
 
-    def __init__(self, namespace, pattern_files):
+    def __init__(self, namespace, pattern_file):
         self.namespace = namespace
+        self.pattern_files = pattern_file.split(',')
         self.rsync_urls = set()
-        for filename in pattern_files:
+        for filename in self.pattern_files:
             self.rsync_urls = self.rsync_urls.union(
                 get_currently_deployed_rsync_urls(filename))
 
