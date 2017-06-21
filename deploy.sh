@@ -52,7 +52,7 @@ elif [[ "$1" == staging ]]; then
   DATASTORE_NAMESPACE=scraper
   CLUSTER=scraper-cluster
   ZONE=us-central1-a
-  NODE_PATTERN_FILE=operator/plsync/staging_patterns.txt,operator/plsync/canary_machines.txt
+  NODE_PATTERN_FILE="operator/plsync/staging_patterns.txt operator/plsync/canary_machines.txt"
 elif [[ "$1" == sandbox-* ]]; then
   # The branch sandbox-pboothe will use the namespace scraper-pboothe, and will
   # deploy to the cluster scraper-cluster-pboothe.

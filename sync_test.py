@@ -268,7 +268,7 @@ class TestSync(unittest.TestCase):
         mock_client.query().fetch.return_value = self.test_datastore_data
 
         collector = sync.PrometheusDatastoreCollector(
-            'test_namespace', 'operator/plsync/staging_patterns.txt')
+            'test_namespace', ['operator/plsync/staging_patterns.txt'])
         metrics = list(collector.collect())
         self.assertEqual(set(x.name for x in metrics),
                          set(['scraper_lastsuccessfulcollection',
@@ -311,7 +311,8 @@ class TestSync(unittest.TestCase):
         # Verify that having a bad value in the system doesn't crash the
         # collector.
         collector = sync.PrometheusDatastoreCollector(
-            'test_namespace', 'operator/plsync/staging_patterns.txt,/dev/null')
+            'test_namespace',
+            ['operator/plsync/staging_patterns.txt', '/dev/null'])
         metrics = list(collector.collect())
         self.assertEqual(set(x.name for x in metrics),
                          set(['scraper_lastsuccessfulcollection',
@@ -341,7 +342,8 @@ class TestSync(unittest.TestCase):
         mock_client.query().fetch.return_value = self.test_datastore_data
 
         collector = sync.PrometheusDatastoreCollector(
-            'test_namespace', '/dev/null,operator/plsync/staging_patterns.txt')
+            'test_namespace',
+            ['/dev/null', 'operator/plsync/staging_patterns.txt'])
         metrics = list(collector.collect())
         self.assertEqual(set(x.name for x in metrics),
                          set(['scraper_lastsuccessfulcollection',
