@@ -120,10 +120,11 @@ def parse_args(argv):
         default='scraper',
         help='The cloud datastore namespace to use in the current project.')
     parser.add_argument(
-        '--node_patterns_file',
-        metavar='FILENAME',
+        '--node_pattern_file',
+        metavar='FILENAMES',
         type=str,
-        help='The file full of node patterns to export to prometheus')
+        help='Comma-separated list of files full of node patterns to export '
+             'to prometheus')
     parser.add_argument(
         '--prometheus_port',
         metavar='PORT',
@@ -421,7 +422,11 @@ class PrometheusDatastoreCollector(object):
 
     def __init__(self, namespace, pattern_file):
         self.namespace = namespace
-        self.pattern_file = pattern_file
+        self.pattern_files = pattern_file.split(',')
+        self.rsync_urls = set()
+        for filename in self.pattern_files:
+            self.rsync_urls = self.rsync_urls.union(
+                get_currently_deployed_rsync_urls(filename))
 
     def collect(self):
         """Get the data from cloud datastore and yield a series of metrics."""
@@ -437,9 +442,8 @@ class PrometheusDatastoreCollector(object):
             'scraper_maxrawfiletimearchived',
             'Time before which files may be deleted',
             labels=['experiment', 'machine', 'rsync_module'])
-        rsync_urls = get_currently_deployed_rsync_urls(self.pattern_file)
         data = [x for x in get_fleet_data(self.namespace)
-                if x['dropboxrsyncaddress'] in rsync_urls]
+                if x['dropboxrsyncaddress'] in self.rsync_urls]
         for fact in data:
             rsync_url = fact['dropboxrsyncaddress']
             labels = deconstruct_rsync_url(rsync_url)
@@ -491,7 +495,7 @@ def main(argv):  # pragma: no cover
     # Set up the prometheus sync job
     prometheus_client.core.REGISTRY.register(
         PrometheusDatastoreCollector(args.datastore_namespace,
-                                     args.node_patterns_file))
+                                     args.node_pattern_file))
     # Set up the monitoring
     prometheus_client.start_http_server(args.prometheus_port)
     start_webserver_in_new_thread(args.webserver_port)

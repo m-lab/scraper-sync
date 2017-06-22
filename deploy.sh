@@ -29,6 +29,13 @@ else
   GIT_COMMIT=$(git log -n 1 | head -n 1 | awk '{print $2}')
 fi
 
+if [[ -e deployment ]]
+then
+  echo "existing deployment/ directory is in the way."
+  exit 1
+fi
+mkdir deployment
+
 if [[ "$1" == production ]]; then
   KEY_FILE=/tmp/production-secret-key.json
   PROJECT=mlab-oti
@@ -45,7 +52,7 @@ elif [[ "$1" == staging ]]; then
   DATASTORE_NAMESPACE=scraper
   CLUSTER=scraper-cluster
   ZONE=us-central1-a
-  NODE_PATTERN_FILE=operator/plsync/staging_patterns.txt
+  NODE_PATTERN_FILE=operator/plsync/staging_patterns.txt,operator/plsync/canary_machines.txt
 elif [[ "$1" == sandbox-* ]]; then
   # The branch sandbox-pboothe will use the namespace scraper-pboothe, and will
   # deploy to the cluster scraper-cluster-pboothe.
@@ -68,12 +75,6 @@ else
   exit 1
 fi
 
-if [[ -e deployment ]]
-then
-  echo "existing deployment/ directory is in the way."
-  exit 1
-fi
-mkdir deployment
 cp deploy.yml deployment
 
 if [[ $2 == travis ]]; then
