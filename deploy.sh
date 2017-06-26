@@ -63,8 +63,8 @@ if [[ "$1" == production ]]; then
   KEY_FILE=/tmp/mlab-oti.json
   PROJECT=mlab-oti
   # TODO(dev): create independent sheets for each project
-  SHEET_ID=143pU25GJidW2KZ_93hgzHdqTqq22wgdxR_3tt3dvrJY   # Test sheet
-  #SHEET_ID=1WftgMyw57gI_5jjKgHbqhRVZBZPADYruwVpw9qmrIdw  # Authoritative sheet
+  #SHEET_ID=143pU25GJidW2KZ_93hgzHdqTqq22wgdxR_3tt3dvrJY   # Test sheet
+  SHEET_ID=1WftgMyw57gI_5jjKgHbqhRVZBZPADYruwVpw9qmrIdw  # Authoritative sheet
   DATASTORE_NAMESPACE=scraper
   CLUSTER=scraper-cluster
   ZONE=us-central1-a
