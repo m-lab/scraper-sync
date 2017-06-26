@@ -39,9 +39,12 @@ import argparse
 import BaseHTTPServer
 import datetime
 import logging
+import httplib
+import json
 import random
 import re
 import SocketServer
+import ssl
 import sys
 import textwrap
 import thread
@@ -53,7 +56,9 @@ import dateutil.parser
 import prometheus_client
 import prometheus_client.core
 
+# pylint: disable=no-name-in-module
 from google.cloud import datastore
+# pylint: enable=no-name-in-module
 from oauth2client.contrib import gce
 
 # Prometheus histogram buckets are web-response-sized by default, with lots of
@@ -378,55 +383,45 @@ def cached(func):
     return cached_func
 
 
-@cached
-def get_currently_deployed_rsync_urls(pattern_file):
+def get_kubernetes_json():  # pragma: no cover
+    """Get the status of the system, in JSON, from the kubernetes server."""
+    context = ssl.create_default_context()
+    context.load_verify_locations(
+        '/var/run/secrets/kubernetes.io/serviceaccount/ca.crt')
+    token = file('/var/run/secrets/kubernetes.io/serviceaccount/token',
+                 'r').read()
+    conn = httplib.HTTPSConnection('kubernetes.default.svc', context=context)
+    conn.request('GET',
+                 'https://kubernetes/apis/extensions/v1beta1/deployments',
+                 headers={'Authorization': 'Bearer ' + token})
+    response = conn.getresponse()
+    return json.load(response)
+
+
+def get_deployed_rsync_urls(namespace):
     """Get a set of deployed rsync urls.
 
-    The return value of this function should never change over the lifetime of a
-    program's execution, so we cache it.
+    We query the local Kubernetes master to get the config.
     """
-    # Operator has no __init__.py, and as such can't be in the import path.
-    # pylint: disable=import-error
-    sys.path.append('./operator/')
-    import plsync.slices
-    import plsync.sites
-    sys.path.pop()
-    # pylint: enable=import-error
-    # Assign every slice to every node.
-    for experiment in plsync.slices.slice_list:
-        for site in plsync.sites.site_list:
-            for _hostname, node in site['nodes'].iteritems():
-                experiment.add_node_address(node)
-    # Extract every rsync_url
-    rsync_urls = []
-    for experiment in plsync.slices.slice_list:
-        for _name, node in experiment['network_list']:
-            if experiment['index'] is None:
-                continue
-            rsync_host = experiment.hostname(node)
-            for rsync_module in experiment['rsync_modules']:
-                url = 'rsync://' + rsync_host + ':7999/' + rsync_module
-                rsync_urls.append(url)
-    # Only export the rsync_urls that match at least one pattern in the
-    # pattern_file.
-    filtered_rsync_urls = []
-    for pattern in open(pattern_file, 'r'):
-        regexp = re.compile(pattern.strip())
-        filtered_rsync_urls.extend(filter(regexp.search, rsync_urls))
-    # Return a set to ensure that no url is in the list twice.
-    return set(filtered_rsync_urls)
+    deployments_json = get_kubernetes_json()
+    deployments = deployments_json['items']
+    urls = []
+    for deployment in deployments:
+        metadata = deployment['metadata']
+        if metadata['namespace'] != namespace:
+            continue
+        labels = deployment['spec']['selector']['matchLabels']
+        rsync_url = ('rsync://{experiment}.{machine}:7999/'
+                     '{rsync_module}'.format(**labels))
+        urls.append(rsync_url)
+    return set(urls)
 
 
 class PrometheusDatastoreCollector(object):
     """A collector to forward the contents of cloud datastore to prometheus."""
 
-    def __init__(self, namespace, pattern_file):
+    def __init__(self, namespace):
         self.namespace = namespace
-        self.pattern_files = pattern_file.split(',')
-        self.rsync_urls = set()
-        for filename in self.pattern_files:
-            self.rsync_urls = self.rsync_urls.union(
-                get_currently_deployed_rsync_urls(filename))
 
     def collect(self):
         """Get the data from cloud datastore and yield a series of metrics."""
@@ -442,8 +437,9 @@ class PrometheusDatastoreCollector(object):
             'scraper_maxrawfiletimearchived',
             'Time before which files may be deleted',
             labels=['experiment', 'machine', 'rsync_module'])
+        deployed_urls = get_deployed_rsync_urls(self.namespace)
         data = [x for x in get_fleet_data(self.namespace)
-                if x['dropboxrsyncaddress'] in self.rsync_urls]
+                if x['dropboxrsyncaddress'] in deployed_urls]
         for fact in data:
             rsync_url = fact['dropboxrsyncaddress']
             labels = deconstruct_rsync_url(rsync_url)
@@ -494,8 +490,7 @@ def main(argv):  # pragma: no cover
     spreadsheet = Spreadsheet(sheets_service, args.spreadsheet)
     # Set up the prometheus sync job
     prometheus_client.core.REGISTRY.register(
-        PrometheusDatastoreCollector(args.datastore_namespace,
-                                     args.node_pattern_file))
+        PrometheusDatastoreCollector(args.datastore_namespace))
     # Set up the monitoring
     prometheus_client.start_http_server(args.prometheus_port)
     start_webserver_in_new_thread(args.webserver_port)
