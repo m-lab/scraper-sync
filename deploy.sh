@@ -37,7 +37,7 @@ fi
 mkdir deployment
 
 if [[ "$1" == production ]]; then
-  KEY_FILE=/tmp/production-secret-key.json
+  KEY_FILE=/tmp/mlab-oti.json
   PROJECT=mlab-oti
   # TODO(dev): create independent sheets for each project
   SHEET_ID=143pU25GJidW2KZ_93hgzHdqTqq22wgdxR_3tt3dvrJY
@@ -46,7 +46,7 @@ if [[ "$1" == production ]]; then
   ZONE=us-central1-a
   NODE_PATTERN_FILE=operator/plsync/production_patterns.txt
 elif [[ "$1" == staging ]]; then
-  KEY_FILE=/tmp/staging-secret-key.json
+  KEY_FILE=/tmp/mlab-staging.json
   PROJECT=mlab-staging
   SHEET_ID=143pU25GJidW2KZ_93hgzHdqTqq22wgdxR_3tt3dvrJY
   DATASTORE_NAMESPACE=scraper
@@ -58,7 +58,7 @@ elif [[ "$1" == sandbox-* ]]; then
   # deploy to the cluster scraper-cluster-pboothe.
   SANDBOXSUFFIX=$(echo "$1" | sed -e 's/^sandbox-//')
   [[ -n "${SANDBOXSUFFIX}" ]] || exit 1
-  KEY_FILE=/tmp/sandbox-secret-key.json
+  KEY_FILE=/tmp/mlab-sandbox.json
   PROJECT=mlab-sandbox
   SHEET_ID=143pU25GJidW2KZ_93hgzHdqTqq22wgdxR_3tt3dvrJY
   # DATASTORE_NAMESPACE must be unique to a cluster (within the same project), so in
