@@ -384,9 +384,11 @@ def get_kubernetes_json():  # pragma: no cover
         '/var/run/secrets/kubernetes.io/serviceaccount/ca.crt')
     token = file('/var/run/secrets/kubernetes.io/serviceaccount/token',
                  'r').read()
-    conn = httplib.HTTPSConnection('kubernetes.default.svc', context=context)
+    k8s_server = 'kubernetes.default.svc'
+    conn = httplib.HTTPSConnection(k8s_server, context=context)
     conn.request('GET',
-                 'https://kubernetes/apis/extensions/v1beta1/deployments',
+                 'https://' + k8s_server +
+                 '/apis/extensions/v1beta1/deployments',
                  headers={'Authorization': 'Bearer ' + token})
     response = conn.getresponse()
     return json.load(response)
