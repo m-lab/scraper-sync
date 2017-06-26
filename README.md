@@ -1,5 +1,7 @@
-[![Build Status](https://travis-ci.org/m-lab/scraper-sync.svg?branch=master)](https://travis-ci.org/m-lab/scraper-sync)
-[![Coverage Status](https://coveralls.io/repos/github/m-lab/scraper-sync/badge.svg?branch=master)](https://coveralls.io/github/m-lab/scraper-sync?branch=master)
+| Branch | Build status | Coverage |
+|:------:|:------------:|:--------:|
+| Master | [![Build Status](https://travis-ci.org/m-lab/scraper-sync.svg?branch=master)](https://travis-ci.org/m-lab/scraper-sync) | [![Coverage Status](https://coveralls.io/repos/github/m-lab/scraper-sync/badge.svg?branch=master)](https://coveralls.io/github/m-lab/scraper-sync?branch=master) |
+| Staging | [![Build Status](https://travis-ci.org/m-lab/scraper-sync.svg?branch=staging)](https://travis-ci.org/m-lab/scraper-sync) | [![Coverage Status](https://coveralls.io/repos/github/m-lab/scraper-sync/badge.svg?branch=staging)](https://coveralls.io/github/m-lab/scraper-sync?branch=staging) |
 
 Scraper-sync pushes the status of the scraper job out to the coordinating
 spreadsheet that is read by the fleet.
