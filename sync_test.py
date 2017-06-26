@@ -22,10 +22,12 @@
 # pylint: disable=missing-docstring, no-self-use, too-many-public-methods
 # pylint: disable=relative-import
 
+import datetime
+import json
+import StringIO
 import unittest
 
-import StringIO
-import json
+import freezegun
 import mock
 import testfixtures
 
@@ -386,20 +388,28 @@ class TestSync(unittest.TestCase):
                       ':7999/utilization',
                       sync.get_deployed_rsync_urls('scraper'))
 
-    def test_cached(self):
+    def test_timed_cache(self):
         args = []
 
-        @sync.cached
+        @sync.timed_cache(hours=1)
         def should_be_only_run_once_per_arg(arg):
             args.append(arg)
             return len(args)
 
-        self.assertEqual(should_be_only_run_once_per_arg('hello'), 1)
-        self.assertEqual(['hello'], args)
-        self.assertEqual(should_be_only_run_once_per_arg('hello'), 1)
-        self.assertEqual(['hello'], args)
-        self.assertEqual(should_be_only_run_once_per_arg('bye'), 2)
-        self.assertEqual(['hello', 'bye'], args)
+        with freezegun.freeze_time('2016-10-26 18:10:00 UTC') as frozen_time:
+            self.assertEqual(should_be_only_run_once_per_arg('hello'), 1)
+            self.assertEqual(['hello'], args)
+            self.assertEqual(should_be_only_run_once_per_arg('hello'), 1)
+            self.assertEqual(['hello'], args)
+            self.assertEqual(should_be_only_run_once_per_arg('bye'), 2)
+            self.assertEqual(['hello', 'bye'], args)
+
+            frozen_time.tick(datetime.timedelta(hours=2))
+
+            self.assertEqual(should_be_only_run_once_per_arg('hello'), 3)
+            self.assertEqual(['hello', 'bye', 'hello'], args)
+            self.assertEqual(should_be_only_run_once_per_arg('hello'), 3)
+            self.assertEqual(['hello', 'bye', 'hello'], args)
 
     def test_deployed_rsync_urls(self):
         urls = sync.get_deployed_rsync_urls('scraper')

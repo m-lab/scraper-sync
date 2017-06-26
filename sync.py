@@ -37,6 +37,7 @@ apis, you could use the following command line:
 
 import argparse
 import BaseHTTPServer
+import collections
 import datetime
 import logging
 import httplib
@@ -362,21 +363,33 @@ def deconstruct_rsync_url(rsync_url):
         return match.group(1), match.group(2), match.group(3)
 
 
-def cached(func):
-    """A decorator that caches a function.
+# A datatype to hold cached data for timed_cache
+CachedData = collections.namedtuple('CachedData', ['expiration', 'value'])
+
+
+def timed_cache(**kwargs):
+    """A decorator that caches a functions results for a set period of time.
 
     Should be part of the stdlib, and actually is part of it in Python 3+.
     """
-    cache = {}
+    timeout = datetime.timedelta(**kwargs)
 
-    def cached_func(*args):
-        """A cached version of the passed-in function."""
-        if args not in cache:
-            cache[args] = func(*args)
-        return cache[args]
-    return cached_func
+    def cacher(func):
+        """The actual function that is applied to decorate the function."""
+        cache = {}
+
+        def cached_func(*args):
+            """A cached version of the passed-in function."""
+            current = datetime.datetime.now()
+            if args not in cache or cache[args].expiration < current:
+                cache[args] = CachedData(expiration=current + timeout,
+                                         value=func(*args))
+            return cache[args].value
+        return cached_func
+    return cacher
 
 
+@timed_cache(hours=1)
 def get_kubernetes_json():  # pragma: no cover
     """Get the status of the system, in JSON, from the kubernetes server."""
     context = ssl.create_default_context()
