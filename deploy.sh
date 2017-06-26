@@ -80,7 +80,7 @@ elif [[ "$1" == staging ]]; then
   CLUSTER=scraper-cluster
   ZONE=us-central1-a
   if git_is_dirty ; then
-    echo "We won't deploy to production with uncommitted changes"
+    echo "We won't deploy to staging with uncommitted changes"
     exit 1
   fi
 elif [[ "$1" == sandbox-* ]]; then
