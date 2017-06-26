@@ -14,5 +14,4 @@ EXPOSE 80
 # Start running the job
 CMD /sync.py \
     --datastore_namespace=$NAMESPACE \
-    --spreadsheet=$SPREADSHEET \
-    --node_pattern_file=$NODE_PATTERN_FILE
+    --spreadsheet=$SPREADSHEET
