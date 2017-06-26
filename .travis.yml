@@ -16,17 +16,31 @@ install:
 script: coverage run --source='.' -m unittest discover --pattern='*_test.py'
 after_success: coveralls
 deploy:
+####################################
+## Sandbox
 - provider: script
   script: ./deploy.sh $TRAVIS_BRANCH travis
   on:
     repo: m-lab/scraper-sync
     all_branches: true
     condition: $TRAVIS_BRANCH == sandbox-*
+
+####################################
+## Staging
 - provider: script
   script: ./deploy.sh staging travis
   on:
     repo: m-lab/scraper-sync
     branch: staging
+
+####################################
+## Production
+- provider: script
+  script: ./deploy.sh production travis
+  on:
+    repo: m-lab/scraper-sync
+    branch: master
+
 before_install:
-- travis/decrypt.sh "$encrypted_a3d09b9fe230_key" "$encrypted_a3d09b9fe230_iv"
-  keys/credentials.tar.gz.enc /tmp/credentials.tar.gz /tmp
+- travis/decrypt.sh "$encrypted_c6050636c18f_key" "$encrypted_c6050636c18f_iv"
+  keys/service-accounts.tar.enc /tmp/service-accounts.tar /tmp

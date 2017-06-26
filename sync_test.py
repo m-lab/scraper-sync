@@ -22,9 +22,12 @@
 # pylint: disable=missing-docstring, no-self-use, too-many-public-methods
 # pylint: disable=relative-import
 
+import datetime
+import json
+import StringIO
 import unittest
 
-import StringIO
+import freezegun
 import mock
 import testfixtures
 
@@ -41,6 +44,12 @@ class TestSync(unittest.TestCase):
             self.key.name = key
 
     def setUp(self):
+        def read_json_from_disk():
+            return json.load(open('testdata_deployments.json'))
+        self.json_patcher = mock.patch.object(
+            sync, 'get_kubernetes_json',
+            side_effect=read_json_from_disk)
+        self.json_patcher.start()
 
         self.test_datastore_data = [
             TestSync.FakeEntity(
@@ -64,6 +73,9 @@ class TestSync(unittest.TestCase):
                  u'errorsincelastsuccessful':
                      '[2017-03-29 15:49:07,364 ERROR run_scraper.py:196] '
                      'Scrape and upload failed: 1'})]
+
+    def tearDown(self):
+        self.json_patcher.stop()
 
     def test_parse_args_no_spreadsheet(self):
         with self.assertRaises(SystemExit):
@@ -267,8 +279,7 @@ class TestSync(unittest.TestCase):
         mock_datastore.Client.return_value = mock_client
         mock_client.query().fetch.return_value = self.test_datastore_data
 
-        collector = sync.PrometheusDatastoreCollector(
-            'test_namespace', 'operator/plsync/staging_patterns.txt')
+        collector = sync.PrometheusDatastoreCollector('scraper')
         metrics = list(collector.collect())
         self.assertEqual(set(x.name for x in metrics),
                          set(['scraper_lastsuccessfulcollection',
@@ -296,22 +307,20 @@ class TestSync(unittest.TestCase):
         mock_client.query().fetch.return_value = self.test_datastore_data
 
         # Add a bad value to all of the good values returned by
-        # get_currently_deployed_rsync_urls().
+        # get_deployed_rsync_urls().
         rsync_urls_with_bad_value_added = set([
             u'rsync://badbad',
-        ]).union(sync.get_currently_deployed_rsync_urls(
-            'operator/plsync/staging_patterns.txt'))
+        ]).union(sync.get_deployed_rsync_urls('scraper'))
 
-        # Make get_currently_deployed_rsync_urls() return the set with the bad
+        # Make get_deployed_rsync_urls() return the set with the bad
         # value.
-        patcher = mock.patch('sync.get_currently_deployed_rsync_urls')
+        patcher = mock.patch('sync.get_deployed_rsync_urls')
         mock_rsync_urls = patcher.start()
         mock_rsync_urls.return_value = rsync_urls_with_bad_value_added
 
         # Verify that having a bad value in the system doesn't crash the
         # collector.
-        collector = sync.PrometheusDatastoreCollector(
-            'test_namespace', 'operator/plsync/staging_patterns.txt,/dev/null')
+        collector = sync.PrometheusDatastoreCollector('scraper')
         metrics = list(collector.collect())
         self.assertEqual(set(x.name for x in metrics),
                          set(['scraper_lastsuccessfulcollection',
@@ -340,8 +349,7 @@ class TestSync(unittest.TestCase):
                  u'maxrawfilemtimearchived': 1490746201L}))
         mock_client.query().fetch.return_value = self.test_datastore_data
 
-        collector = sync.PrometheusDatastoreCollector(
-            'test_namespace', '/dev/null,operator/plsync/staging_patterns.txt')
+        collector = sync.PrometheusDatastoreCollector('scraper')
         metrics = list(collector.collect())
         self.assertEqual(set(x.name for x in metrics),
                          set(['scraper_lastsuccessfulcollection',
@@ -369,34 +377,43 @@ class TestSync(unittest.TestCase):
                 '/utilization'),
             ('utility.mlab', 'mlab4.nuq0t.measurement-lab.org', 'utilization'))
 
-    def test_get_currently_deployed_rsync_urls(self):
-        self.assertIn('rsync://utility.mlab.mlab3.atl06.measurement-lab.org'
+    def test_get_deployed_rsync_urls(self):
+        self.assertIn('rsync://utility.mlab.mlab4.atl06.measurement-lab.org'
                       ':7999/utilization',
-                      sync.get_currently_deployed_rsync_urls(
-                          'operator/plsync/production_patterns.txt'))
-        self.assertNotIn('rsync://utility.mlab.mlab4.atl06.measurement-lab.org'
+                      sync.get_deployed_rsync_urls('scraper'))
+        self.assertNotIn('rsync://utility.mlab.mlab3.atl06.measurement-lab.org'
                          ':7999/utilization',
-                         sync.get_currently_deployed_rsync_urls(
-                             'operator/plsync/production_patterns.txt'))
+                         sync.get_deployed_rsync_urls('scraper'))
         self.assertIn('rsync://utility.mlab.mlab4.atl05.measurement-lab.org'
                       ':7999/utilization',
-                      sync.get_currently_deployed_rsync_urls(
-                          'operator/plsync/staging_patterns.txt'))
+                      sync.get_deployed_rsync_urls('scraper'))
 
-    def test_cached(self):
+    def test_timed_cache(self):
         args = []
 
-        @sync.cached
+        @sync.timed_cache(hours=1)
         def should_be_only_run_once_per_arg(arg):
             args.append(arg)
             return len(args)
 
-        self.assertEqual(should_be_only_run_once_per_arg('hello'), 1)
-        self.assertEqual(['hello'], args)
-        self.assertEqual(should_be_only_run_once_per_arg('hello'), 1)
-        self.assertEqual(['hello'], args)
-        self.assertEqual(should_be_only_run_once_per_arg('bye'), 2)
-        self.assertEqual(['hello', 'bye'], args)
+        with freezegun.freeze_time('2016-10-26 18:10:00 UTC') as frozen_time:
+            self.assertEqual(should_be_only_run_once_per_arg('hello'), 1)
+            self.assertEqual(['hello'], args)
+            self.assertEqual(should_be_only_run_once_per_arg('hello'), 1)
+            self.assertEqual(['hello'], args)
+            self.assertEqual(should_be_only_run_once_per_arg('bye'), 2)
+            self.assertEqual(['hello', 'bye'], args)
+
+            frozen_time.tick(datetime.timedelta(hours=2))
+
+            self.assertEqual(should_be_only_run_once_per_arg('hello'), 3)
+            self.assertEqual(['hello', 'bye', 'hello'], args)
+            self.assertEqual(should_be_only_run_once_per_arg('hello'), 3)
+            self.assertEqual(['hello', 'bye', 'hello'], args)
+
+    def test_deployed_rsync_urls(self):
+        urls = sync.get_deployed_rsync_urls('scraper')
+        self.assertTrue(len(urls) > 5)
 
 
 if __name__ == '__main__':  # pragma: no cover
