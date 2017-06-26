@@ -41,7 +41,6 @@ deploy:
     repo: m-lab/scraper-sync
     branch: master
 
-
 before_install:
 - travis/decrypt.sh "$encrypted_c6050636c18f_key" "$encrypted_c6050636c18f_iv"
   keys/service-accounts.tar.enc /tmp/service-accounts.tar /tmp
