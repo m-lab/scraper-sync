@@ -26,7 +26,7 @@ deploy:
     condition: $TRAVIS_BRANCH == sandbox-*
 
 ####################################
-## Sandbox
+## Staging
 - provider: script
   script: ./deploy.sh staging travis
   on:
