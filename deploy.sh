@@ -36,15 +36,42 @@ then
 fi
 mkdir deployment
 
+# Adapted from the one from ezprompt.net
+function git_is_dirty {
+    status=`git status 2>&1 | tee`
+    dirty=`echo -n "${status}" 2> /dev/null | grep "modified:" &> /dev/null; echo "$?"`
+    newfile=`echo -n "${status}" 2> /dev/null | grep "new file:" &> /dev/null; echo "$?"`
+    renamed=`echo -n "${status}" 2> /dev/null | grep "renamed:" &> /dev/null; echo "$?"`
+    deleted=`echo -n "${status}" 2> /dev/null | grep "deleted:" &> /dev/null; echo "$?"`
+    bits=''
+    if [ "${renamed}" == "0" ]; then
+        bits=">${bits}"
+    fi
+    if [ "${newfile}" == "0" ]; then
+        bits="+${bits}"
+    fi
+    if [ "${deleted}" == "0" ]; then
+        bits="x${bits}"
+    fi
+    if [ "${dirty}" == "0" ]; then
+        bits="!${bits}"
+    fi
+    [[ -n "${bits}" ]]
+}
+
 if [[ "$1" == production ]]; then
   KEY_FILE=/tmp/mlab-oti.json
   PROJECT=mlab-oti
   # TODO(dev): create independent sheets for each project
-  SHEET_ID=143pU25GJidW2KZ_93hgzHdqTqq22wgdxR_3tt3dvrJY
+  #SHEET_ID=143pU25GJidW2KZ_93hgzHdqTqq22wgdxR_3tt3dvrJY   # Test sheet
+  SHEET_ID=1WftgMyw57gI_5jjKgHbqhRVZBZPADYruwVpw9qmrIdw  # Authoritative sheet
   DATASTORE_NAMESPACE=scraper
   CLUSTER=scraper-cluster
   ZONE=us-central1-a
-  NODE_PATTERN_FILE=operator/plsync/production_patterns.txt
+  if git_is_dirty ; then
+    echo "We won't deploy to production with uncommitted changes"
+    exit 1
+  fi
 elif [[ "$1" == staging ]]; then
   KEY_FILE=/tmp/mlab-staging.json
   PROJECT=mlab-staging
@@ -52,7 +79,10 @@ elif [[ "$1" == staging ]]; then
   DATASTORE_NAMESPACE=scraper
   CLUSTER=scraper-cluster
   ZONE=us-central1-a
-  NODE_PATTERN_FILE=operator/plsync/staging_patterns.txt,operator/plsync/canary_machines.txt
+  if git_is_dirty ; then
+    echo "We won't deploy to staging with uncommitted changes"
+    exit 1
+  fi
 elif [[ "$1" == sandbox-* ]]; then
   # The branch sandbox-pboothe will use the namespace scraper-pboothe, and will
   # deploy to the cluster scraper-cluster-pboothe.
@@ -69,7 +99,6 @@ elif [[ "$1" == sandbox-* ]]; then
   # choose one.
   CLUSTER=scraper-cluster-${SANDBOXSUFFIX}
   ZONE=us-central1-a
-  NODE_PATTERN_FILE=sandbox-nodes.txt
 else
   echo "BAD ARGUMENT TO $0"
   exit 1
@@ -86,8 +115,7 @@ fi
   IMAGE_URL gcr.io/${PROJECT}/github-m-lab-scraper-sync:${GIT_COMMIT} \
   SPREADSHEET_ID ${SHEET_ID} \
   NAMESPACE ${DATASTORE_NAMESPACE} \
-  GITHUB_COMMIT http://github.com/m-lab/scraper-sync/tree/${GIT_COMMIT} \
-  NODE_PATTERN_FILE ${NODE_PATTERN_FILE}
+  GITHUB_COMMIT http://github.com/m-lab/scraper-sync/tree/${GIT_COMMIT}
 
 # Build the image and push it to GCR
 ./travis/build_and_push_container.sh \
