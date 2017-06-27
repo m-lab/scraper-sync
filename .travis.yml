@@ -31,7 +31,8 @@ deploy:
   script: ./deploy.sh staging travis
   on:
     repo: m-lab/scraper-sync
-    branch: staging
+    all_branches: true
+    condition: $TRAVIS_BRANCH == staging && $TRAVIS_EVENT_TYPE == push
 
 ####################################
 ## Production
@@ -39,7 +40,8 @@ deploy:
   script: ./deploy.sh production travis
   on:
     repo: m-lab/scraper-sync
-    branch: master
+    all_branches: true
+    condition: $TRAVIS_BRANCH == master && $TRAVIS_EVENT_TYPE == push
 
 before_install:
 - travis/decrypt.sh "$encrypted_c6050636c18f_key" "$encrypted_c6050636c18f_iv"
