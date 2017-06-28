@@ -1,10 +1,4 @@
 FROM sync
-RUN mkdir /test
-ADD test-requirements.txt /test/test-requirements.txt
-RUN pip install -q -r /test/test-requirements.txt
-ADD git-hooks /test/git-hooks
-RUN cp /sync.py /test/sync.py
-ADD sync_test.py /test/sync_test.py
-ADD testdata_deployments.json /test/testdata_deployments.json
-RUN cd /test && bash git-hooks/python-pre-commit
-CMD cd /test && bash git-hooks/python-prepare-commit-msg
+ADD test-requirements.txt /test-requirements.txt
+RUN pip install -q -r /test-requirements.txt
+RUN apt-get install -y git
