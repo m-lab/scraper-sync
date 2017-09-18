@@ -138,7 +138,7 @@ class TestSync(unittest.TestCase):
         mock_handler.wfile = StringIO.StringIO()
         mock_handler.client_address = (1234, '127.0.0.1')
 
-        sync.WebHandler.do_GET(mock_handler)
+        sync.WebHandler.do_root_url(mock_handler)
 
         self.assertEqual(mock_handler.wfile.getvalue().count('<tr>'), 4)
 
@@ -151,7 +151,7 @@ class TestSync(unittest.TestCase):
         mock_handler.wfile = StringIO.StringIO()
         mock_handler.client_address = (1234, '127.0.0.1')
 
-        sync.WebHandler.do_GET(mock_handler)
+        sync.WebHandler.do_root_url(mock_handler)
 
         self.assertEqual(mock_handler.wfile.getvalue().count('<td>'), 0)
 
@@ -163,7 +163,7 @@ class TestSync(unittest.TestCase):
         mock_handler.wfile = StringIO.StringIO()
         mock_handler.client_address = (1234, '127.0.0.1')
 
-        sync.WebHandler.do_GET(mock_handler)
+        sync.WebHandler.do_root_url(mock_handler)
 
         self.assertEqual(mock_handler.wfile.getvalue().count('<td>'), 0)
         self.assertEqual(mock_handler.wfile.getvalue().count('<pre>'), 1)

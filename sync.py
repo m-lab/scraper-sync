@@ -51,6 +51,7 @@ import textwrap
 import thread
 import time
 import traceback
+import urlparse
 
 import apiclient
 import dateutil.parser
@@ -166,7 +167,20 @@ class WebHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     # pylint: disable=invalid-name
     def do_GET(self):
         """Print out the ground truth from cloud datastore as a webpage."""
-        logging.info('Request from %s', self.client_address)
+        parsed_path = urlparse.urlparse(self.path)
+        logging.info('Request of %s from %s', parsed_path.path,
+                     self.client_address)
+        print 'PATH', parsed_path.path
+        if parsed_path.path == '/':
+            self.do_root_url()
+        elif parsed_path.path == '/scraper_status':
+            self.do_scraper_status(parsed_path.query)
+        else:
+            self.send_error(404)
+    # pylint: enable=invalid-name
+
+    def do_root_url(self):
+        """Draw a table when a request comes in for '/'."""
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
@@ -193,10 +207,11 @@ class WebHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         try:
             data = get_fleet_data(WebHandler.namespace)
         # This will be used for debugging errors, so catching an overly-broad
-        # exception is apprpriate.
+        # exception is appropriate.
         # pylint: disable=broad-except
-        except Exception as e:
-            logging.error('Unable to retrieve data from datastore: %s', str(e))
+        except Exception as exc:
+            logging.error('Unable to retrieve data from datastore: %s',
+                          str(exc))
             print >> self.wfile, '</table>'
             print >> self.wfile, '<p>Datastore error:</p><pre>'
             traceback.print_exc(file=self.wfile)
@@ -222,7 +237,29 @@ class WebHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         print >> self.wfile, '  <center><small>', time.ctime()
         print >> self.wfile, '    </small></center>'
         print >> self.wfile, '</body></html>'
-    # pylint: enable=invalid-name
+
+
+    def do_scraper_status(self, query_string):
+        """Give the status, in JSON form, of the specified rsync endpoints.
+
+        This returns a JSON list of JSON objects, because it will return the
+        status of all endpoints that contain a substring of the
+        rsync_address argument value.  If no such argument exists, or it
+        is the empty string, or anything else goes wrong with the parsing, then
+        this will return the status of every endpoint with status in cloud
+        datastore.
+
+        Args:
+          query_string: the URL query string, not yet parsed.
+        """
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json')
+        self.end_headers()
+        endpoints = []
+        # The JSON should encode a non-empty object for reasons described here:
+        #   https://www.owasp.org/index.php/AJAX_Security_Cheat_Sheet
+        output = {'result': endpoints}
+        print >> self.wfile, json.dumps(output)
 
 
 def start_webserver_in_new_thread(port):  # pragma: no cover
