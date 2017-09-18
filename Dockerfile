@@ -1,10 +1,11 @@
-FROM google/cloud-sdk
+FROM alpine:3.6
 MAINTAINER Peter Boothe <pboothe@google.com>
 # Install all the standard packages we need
-RUN apt-get -q update && apt-get install -y -q python-dev python-pip
+RUN apk update
+RUN apk add python python-dev py2-pip gcc g++ libc-dev bash
 # Install all the python requirements
 ADD requirements.txt /requirements.txt
-RUN pip install -q -r requirements.txt
+RUN pip install -r requirements.txt
 ADD sync.py /sync.py
 RUN chmod +x /sync.py
 # The monitoring port

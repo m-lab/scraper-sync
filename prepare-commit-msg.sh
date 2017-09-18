@@ -6,7 +6,8 @@
 
 set -e
 
-docker run synctest | (
+docker run -v `pwd`:/test -w /test synctest \
+  ./git-hooks/python-prepare-commit-msg | (
   # If a filename argument was passed in, comment all output and append it to
   # that file.  Otherwise just allow the output of the command to go to stdout.
   if [[ -n "$1" ]]; then
