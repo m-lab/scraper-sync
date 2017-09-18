@@ -421,12 +421,23 @@ class TestSync(unittest.TestCase):
         self.assertEqual(self.mock_handler.do_scraper_status.call_count, 0)
         sync.WebHandler.do_GET(self.mock_handler)
         self.assertEqual(self.mock_handler.do_scraper_status.call_count, 1)
+        self.assertEqual(self.mock_handler.do_scraper_status.call_args[0],
+                         ('rsync_url=thing',))
 
     def test_do_404_on_bad_urls(self):
         self.mock_handler.path = 'BAD'
         self.assertEqual(self.mock_handler.send_error.call_count, 0)
         sync.WebHandler.do_GET(self.mock_handler)
         self.assertEqual(self.mock_handler.send_error.call_count, 1)
+
+    @mock.patch.object(sync, 'datastore')
+    def test_do_scraper_status_bad_args(self, mock_datastore):
+        mock_client = mock.Mock()
+        mock_datastore.Client.return_value = mock_client
+        mock_client.query().fetch.return_value = self.test_datastore_data
+        sync.WebHandler.do_scraper_status(self.mock_handler, 'f=g')
+        result = json.loads(self.mock_handler.wfile.getvalue())['result']
+        self.assertEqual(len(result), 3)
 
 
 if __name__ == '__main__':  # pragma: no cover
