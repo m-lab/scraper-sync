@@ -146,17 +146,33 @@ KEYS = ['dropboxrsyncaddress', 'contact', 'lastsuccessfulcollection',
         'maxrawfilemtimearchived']
 
 
-def get_fleet_data(namespace):
-    """Returns a list of dictionaries, one for every entry in the namespace."""
+def status_to_dict(status_entity):
+    """Converts an Entity into a dictionary."""
+    answer = {}
+    answer[KEYS[0]] = status_entity.key.name
+    for k in KEYS[1:]:
+        answer[k] = status_entity.get(k, '')
+    return answer
+
+
+def get_fleet_data(namespace, rsync_url_fragment=None):
+    """Returns a list of dictionaries, one for every entry requested.
+
+    Each status has a dropboxrsyncaddress that contains rsync_url_fragment as a
+    substring.
+    """
     datastore_client = datastore.Client(namespace=namespace)
-    answers = []
-    for item in datastore_client.query(kind='dropboxrsyncaddress').fetch():
-        answer = {}
-        answer[KEYS[0]] = item.key.name
-        for k in KEYS[1:]:
-            answer[k] = item.get(k, '')
-        answers.append(answer)
-    return answers
+    query = datastore_client.query(kind='dropboxrsyncaddress')
+    if rsync_url_fragment:
+        # Request all keys, filter down, then request full entities only for the
+        # relevant keys.  Should save us load on cloud datastore.
+        query.keys_only()
+        keys = [key for key in query.fetch() if rsync_url_fragment in key.name]
+        statuses = datastore_client.get_multi(keys)
+    else:
+        # Special case when all data is requested
+        statuses = query.fetch()
+    return [status_to_dict(status) for status in statuses]
 
 
 class WebHandler(BaseHTTPServer.BaseHTTPRequestHandler):
@@ -173,7 +189,7 @@ class WebHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         print 'PATH', parsed_path.path
         if parsed_path.path == '/':
             self.do_root_url()
-        elif parsed_path.path == '/scraper_status':
+        elif parsed_path.path == '/json_status':
             self.do_scraper_status(parsed_path.query)
         else:
             self.send_error(404)
@@ -237,7 +253,6 @@ class WebHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         print >> self.wfile, '  <center><small>', time.ctime()
         print >> self.wfile, '    </small></center>'
         print >> self.wfile, '</body></html>'
-
 
     def do_scraper_status(self, query_string):
         """Give the status, in JSON form, of the specified rsync endpoints.

@@ -12,10 +12,10 @@ day.  Unfortunately, the sheets API limits each sheet to 40,000 API calls per
 day.
 
 The system also provides an alternate method of getting the same information,
-namely to query the service directly at the `/scraper_status` url. To get a JSON
+namely to query the service directly at the `/json_status` url. To get a JSON
 object that contains only a subset of the data, use the `rsync_url` argument.
 For example, to see, in JSON form, the status of all `mlab1` machines, GET the
-URL `/scraper_status?rsync_url=mlab1`
+URL `/json_status?rsync_url=mlab1`
 
 The `rsync_url` argument is compared the URL of every rsync endpoint using
 the substring operation.
