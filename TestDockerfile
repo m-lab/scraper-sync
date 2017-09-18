@@ -1,4 +1,4 @@
 FROM sync
-RUN apk add git libffi-dev openssl-dev go-tools godep
+RUN apk add git libffi-dev openssl-dev
 ADD test-requirements.txt /test-requirements.txt
 RUN pip install -r /test-requirements.txt
