@@ -40,6 +40,7 @@ deploy:
   script: ./deploy.sh production travis
   on:
     repo: m-lab/scraper-sync
+    # TODO(https://github.com/m-lab/scraper-sync/issues/37) validate tag
     tags: true
 
 before_install:
