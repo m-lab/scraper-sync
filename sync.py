@@ -243,11 +243,10 @@ class WebHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         """Give the status, in JSON form, of the specified rsync endpoints.
 
         This returns a JSON list of JSON objects, because it will return the
-        status of all endpoints that contain a substring of the
-        rsync_address argument value.  If no such argument exists, or it
-        is the empty string, or anything else goes wrong with the parsing, then
-        this will return the status of every endpoint with status in cloud
-        datastore.
+        status of all endpoints that contain a substring of the rsync_url
+        argument value.  If no such argument exists, or it is the empty string,
+        or anything else goes wrong with the parsing, then this will return the
+        status of every endpoint with status in cloud datastore.
 
         Args:
           query_string: the URL query string, not yet parsed.
@@ -256,7 +255,8 @@ class WebHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         self.send_header('Content-type', 'application/json')
         self.end_headers()
         endpoints = []
-        # The JSON should encode a non-empty object for reasons described here:
+        # The JSON should always encode a non-empty object (not string or array)
+        # for reasons described here:
         #   https://www.owasp.org/index.php/AJAX_Security_Cheat_Sheet
         output = {'result': endpoints}
         print >> self.wfile, json.dumps(output)
