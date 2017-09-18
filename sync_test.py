@@ -74,6 +74,10 @@ class TestSync(unittest.TestCase):
                      '[2017-03-29 15:49:07,364 ERROR run_scraper.py:196] '
                      'Scrape and upload failed: 1'})]
 
+        self.mock_handler = mock.Mock(sync.WebHandler)
+        self.mock_handler.wfile = StringIO.StringIO()
+        self.mock_handler.client_address = (1234, '127.0.0.1')
+
     def tearDown(self):
         self.json_patcher.stop()
 
@@ -134,39 +138,30 @@ class TestSync(unittest.TestCase):
         mock_client = mock.Mock()
         mock_datastore.Client.return_value = mock_client
         mock_client.query().fetch.return_value = self.test_datastore_data
-        mock_handler = mock.Mock(sync.WebHandler)
-        mock_handler.wfile = StringIO.StringIO()
-        mock_handler.client_address = (1234, '127.0.0.1')
 
-        sync.WebHandler.do_root_url(mock_handler)
+        sync.WebHandler.do_root_url(self.mock_handler)
 
-        self.assertEqual(mock_handler.wfile.getvalue().count('<tr>'), 4)
+        self.assertEqual(self.mock_handler.wfile.getvalue().count('<tr>'), 4)
 
     @mock.patch.object(sync, 'datastore')
     def test_do_get_no_data(self, mock_datastore):
         mock_client = mock.Mock()
         mock_datastore.Client.return_value = mock_client
         mock_client.query().fetch.return_value = []
-        mock_handler = mock.Mock(sync.WebHandler)
-        mock_handler.wfile = StringIO.StringIO()
-        mock_handler.client_address = (1234, '127.0.0.1')
 
-        sync.WebHandler.do_root_url(mock_handler)
+        sync.WebHandler.do_root_url(self.mock_handler)
 
-        self.assertEqual(mock_handler.wfile.getvalue().count('<td>'), 0)
+        self.assertEqual(self.mock_handler.wfile.getvalue().count('<td>'), 0)
 
     @mock.patch.object(sync, 'datastore')
     @testfixtures.log_capture()
     def test_do_get_datastore_failure(self, mock_datastore, log):
         mock_datastore.Client.side_effect = Exception
-        mock_handler = mock.Mock(sync.WebHandler)
-        mock_handler.wfile = StringIO.StringIO()
-        mock_handler.client_address = (1234, '127.0.0.1')
 
-        sync.WebHandler.do_root_url(mock_handler)
+        sync.WebHandler.do_root_url(self.mock_handler)
 
-        self.assertEqual(mock_handler.wfile.getvalue().count('<td>'), 0)
-        self.assertEqual(mock_handler.wfile.getvalue().count('<pre>'), 1)
+        self.assertEqual(self.mock_handler.wfile.getvalue().count('<td>'), 0)
+        self.assertEqual(self.mock_handler.wfile.getvalue().count('<pre>'), 1)
         self.assertIn('ERROR', [x.levelname for x in log.records])
 
     def test_docstring_exists(self):
@@ -414,6 +409,24 @@ class TestSync(unittest.TestCase):
     def test_deployed_rsync_urls(self):
         urls = sync.get_deployed_rsync_urls('scraper')
         self.assertTrue(len(urls) > 5)
+
+    def test_do_get_root(self):
+        self.mock_handler.path = '/'
+        self.assertEqual(self.mock_handler.do_root_url.call_count, 0)
+        sync.WebHandler.do_GET(self.mock_handler)
+        self.assertEqual(self.mock_handler.do_root_url.call_count, 1)
+
+    def test_do_get_json_status(self):
+        self.mock_handler.path = '/json_status?rsync_url=thing'
+        self.assertEqual(self.mock_handler.do_scraper_status.call_count, 0)
+        sync.WebHandler.do_GET(self.mock_handler)
+        self.assertEqual(self.mock_handler.do_scraper_status.call_count, 1)
+
+    def test_do_404_on_bad_urls(self):
+        self.mock_handler.path = 'BAD'
+        self.assertEqual(self.mock_handler.send_error.call_count, 0)
+        sync.WebHandler.do_GET(self.mock_handler)
+        self.assertEqual(self.mock_handler.send_error.call_count, 1)
 
 
 if __name__ == '__main__':  # pragma: no cover

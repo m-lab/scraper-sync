@@ -186,7 +186,6 @@ class WebHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         parsed_path = urlparse.urlparse(self.path)
         logging.info('Request of %s from %s', parsed_path.path,
                      self.client_address)
-        print 'PATH', parsed_path.path
         if parsed_path.path == '/':
             self.do_root_url()
         elif parsed_path.path == '/json_status':
@@ -269,7 +268,9 @@ class WebHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type', 'application/json')
         self.end_headers()
-        endpoints = []
+        data = urlparse.parse_qs(query_string)
+        rsync_url_fragment = data.get('rsync_url', '')
+        endpoints = get_fleet_data(WebHandler.namespace, rsync_url_fragment)
         # The JSON should always encode a non-empty object (not string or array)
         # for reasons described here:
         #   https://www.owasp.org/index.php/AJAX_Security_Cheat_Sheet
