@@ -51,6 +51,7 @@ import textwrap
 import thread
 import time
 import traceback
+import urlparse
 
 import apiclient
 import dateutil.parser
@@ -145,28 +146,54 @@ KEYS = ['dropboxrsyncaddress', 'contact', 'lastsuccessfulcollection',
         'maxrawfilemtimearchived']
 
 
-def get_fleet_data(namespace):
-    """Returns a list of dictionaries, one for every entry in the namespace."""
+def status_to_dict(status_entity):
+    """Converts an Entity into a dictionary."""
+    answer = {}
+    answer[KEYS[0]] = status_entity.key.name
+    for k in KEYS[1:]:
+        answer[k] = status_entity.get(k, '')
+    return answer
+
+
+def get_fleet_data(namespace, rsync_url_fragment=None):
+    """Returns a list of dictionaries, one for every entry requested.
+
+    Each status has a dropboxrsyncaddress that contains rsync_url_fragment as a
+    substring.
+    """
     datastore_client = datastore.Client(namespace=namespace)
-    answers = []
-    for item in datastore_client.query(kind='dropboxrsyncaddress').fetch():
-        answer = {}
-        answer[KEYS[0]] = item.key.name
-        for k in KEYS[1:]:
-            answer[k] = item.get(k, '')
-        answers.append(answer)
-    return answers
+    query = datastore_client.query(kind='dropboxrsyncaddress')
+    if rsync_url_fragment:
+        # Request all keys, filter down, then request full entities only for the
+        # relevant keys.  Should save us load on cloud datastore.
+        query.keys_only()
+        keys = [x.key for x in query.fetch()
+                if rsync_url_fragment in x.key.name]
+        statuses = datastore_client.get_multi(keys)
+    else:
+        # Special case when all data is requested
+        statuses = query.fetch()
+    return [status_to_dict(status) for status in statuses]
 
 
 class WebHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     """Print the ground truth from cloud datastore."""
     namespace = 'test'
 
-    # The name is inherited, so we have to use it even if pylint hates it.
-    # pylint: disable=invalid-name
     def do_GET(self):
         """Print out the ground truth from cloud datastore as a webpage."""
-        logging.info('Request from %s', self.client_address)
+        parsed_path = urlparse.urlparse(self.path)
+        logging.info('Request of %s from %s', parsed_path.path,
+                     self.client_address)
+        if parsed_path.path == '/':
+            self.do_root_url()
+        elif parsed_path.path == '/json_status':
+            self.do_scraper_status(parsed_path.query)
+        else:
+            self.send_error(404)
+
+    def do_root_url(self):
+        """Draw a table when a request comes in for '/'."""
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
@@ -193,10 +220,11 @@ class WebHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         try:
             data = get_fleet_data(WebHandler.namespace)
         # This will be used for debugging errors, so catching an overly-broad
-        # exception is apprpriate.
+        # exception is appropriate.
         # pylint: disable=broad-except
-        except Exception as e:
-            logging.error('Unable to retrieve data from datastore: %s', str(e))
+        except Exception as exc:
+            logging.error('Unable to retrieve data from datastore: %s',
+                          str(exc))
             print >> self.wfile, '</table>'
             print >> self.wfile, '<p>Datastore error:</p><pre>'
             traceback.print_exc(file=self.wfile)
@@ -222,7 +250,34 @@ class WebHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         print >> self.wfile, '  <center><small>', time.ctime()
         print >> self.wfile, '    </small></center>'
         print >> self.wfile, '</body></html>'
-    # pylint: enable=invalid-name
+
+    def do_scraper_status(self, query_string):
+        """Give the status, in JSON form, of the specified rsync endpoints.
+
+        This returns a JSON list of JSON objects, because it will return the
+        status of all endpoints that contain a substring of the rsync_filter
+        argument value.  If no such argument exists, or it is the empty string,
+        or anything else goes wrong with the parsing, then this will return the
+        status of every endpoint with status in cloud datastore.
+
+        Args:
+          query_string: the URL query string, not yet parsed.
+        """
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json')
+        self.end_headers()
+        data = urlparse.parse_qs(query_string)
+        rsync_url_fragment = data.get('rsync_filter', [])
+        if rsync_url_fragment:
+            rsync_url_fragment = rsync_url_fragment[0]
+        else:
+            rsync_url_fragment = ''
+        endpoints = get_fleet_data(WebHandler.namespace, rsync_url_fragment)
+        # The JSON should always encode a non-empty object (not string or array)
+        # for reasons described here:
+        #   https://www.owasp.org/index.php/AJAX_Security_Cheat_Sheet
+        output = {'result': endpoints}
+        print >> self.wfile, json.dumps(output)
 
 
 def start_webserver_in_new_thread(port):  # pragma: no cover

@@ -1,4 +1,6 @@
 language: python
+# Require docker on the Travis nodes because we test the code inside its
+# container and we use docker for deployment.
 services:
 - docker
 cache:
@@ -9,11 +11,11 @@ python: '2.7'
 dist: trusty
 sudo: required
 install:
-- pip install -r requirements.txt
-- pip install -r test-requirements.txt
+# Required for code coverage
 - pip install coveralls
+# Required for deployment
 - $TRAVIS_BUILD_DIR/travis/install_gcloud.sh kubectl
-script: coverage run --source='.' -m unittest discover --pattern='*_test.py'
+script: ./pre-commit.sh && ./prepare-commit-msg.sh
 after_success: coveralls
 deploy:
 ####################################

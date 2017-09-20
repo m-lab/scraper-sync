@@ -9,5 +9,7 @@ set -e
 
 docker build . -f Dockerfile -t sync
 docker build . -f TestDockerfile -t synctest
-docker run -v `pwd`:/test -w /test synctest ./git-hooks/python-pre-commit
+# Keep the full-path filenames consistent inside and outside the container in an
+# effort to not confuse code coverage tools.
+docker run -v `pwd`:`pwd` -w `pwd` synctest ./run_tests_with_emulator.sh
 rm -f *.pyc
