@@ -167,7 +167,8 @@ def get_fleet_data(namespace, rsync_url_fragment=None):
         # Request all keys, filter down, then request full entities only for the
         # relevant keys.  Should save us load on cloud datastore.
         query.keys_only()
-        keys = [key for key in query.fetch() if rsync_url_fragment in key.name]
+        keys = [x.key for x in query.fetch()
+                if rsync_url_fragment in x.key.name]
         statuses = datastore_client.get_multi(keys)
     else:
         # Special case when all data is requested
@@ -179,8 +180,6 @@ class WebHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     """Print the ground truth from cloud datastore."""
     namespace = 'test'
 
-    # The name is inherited, so we have to use it even if pylint hates it.
-    # pylint: disable=invalid-name
     def do_GET(self):
         """Print out the ground truth from cloud datastore as a webpage."""
         parsed_path = urlparse.urlparse(self.path)
@@ -192,7 +191,6 @@ class WebHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             self.do_scraper_status(parsed_path.query)
         else:
             self.send_error(404)
-    # pylint: enable=invalid-name
 
     def do_root_url(self):
         """Draw a table when a request comes in for '/'."""

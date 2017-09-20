@@ -29,9 +29,71 @@ import unittest
 
 import freezegun
 import mock
+import requests
 import testfixtures
 
 import sync
+
+# pylint: disable=no-name-in-module
+from google.cloud import datastore
+import google.auth.credentials
+# pylint: enable=no-name-in-module
+
+
+class EmulatorCreds(google.auth.credentials.Credentials):
+    """A mock credential object.
+
+    Used to avoid the need for auth entirely when using local versions of cloud
+    services.
+    """
+
+    # Some random methods need to get overwritten for this to work. Put them
+    # between the two "arguments-differ" directives for maximal flexibility.
+    # pylint: disable=arguments-differ
+    def refresh(self, *_args, **_kwargs):  # pragma: no cover
+        return
+    # pylint: enable=arguments-differ
+
+    @staticmethod
+    def create_scoped_required():  # pragma: no cover
+        return False
+
+
+DATASTORE_DATA = [
+    ('rsync://utility.mlab.mlab4.prg01.measurement-lab.org:7999/switch',
+     {'lastsuccessfulcollection': 'x2017-03-28',
+      'errorsincelastsuccessful': '',
+      'lastcollectionattempt': 'x2017-03-29-21:22',
+      'maxrawfilemtimearchived': 1490746201L}),
+    ('rsync://utility.mlab.mlab4.prg01.measurement-lab.org:7999/utilization',
+     {'errorsincelastsuccessful': '',
+      'lastsuccessfulcollection': 'x2017-03-28',
+      'lastcollectionattempt': 'x2017-03-29-21:04',
+      'maxrawfilemtimearchived': 1490746202L}),
+    ('rsync://utility.mlab.mlab4.sea02.measurement-lab.org:7999/switch',
+     {'lastcollectionattempt': 'x2017-03-29-15:46',
+      'errorsincelastsuccessful':
+      '[2017-03-29 15:49:07,364 ERROR run_scraper.py:196] '
+      'Scrape and upload failed: 1'})]
+
+
+def setUpModule():
+    creds = EmulatorCreds()
+    sync.WebHandler.namespace = 'test'
+    datastore_client = datastore.Client(project='mlab-sandbox',
+                                        namespace='test',
+                                        credentials=creds,
+                                        _http=requests.Session())
+    with datastore_client.transaction():
+        for url, data in DATASTORE_DATA:
+            entity = datastore.Entity(
+                key=datastore_client.key('dropboxrsyncaddress', url))
+            for (key, value) in data.items():
+                entity[key] = value
+            datastore_client.put(entity)
+    datastore_patcher = mock.patch.object(datastore, 'Client',
+                                          return_value=datastore_client)
+    datastore_patcher.start()
 
 
 class TestSync(unittest.TestCase):
@@ -52,27 +114,7 @@ class TestSync(unittest.TestCase):
         self.json_patcher.start()
 
         self.test_datastore_data = [
-            TestSync.FakeEntity(
-                u'rsync://utility.mlab.mlab4.prg01.'
-                'measurement-lab.org:7999/switch',
-                {u'lastsuccessfulcollection': 'x2017-03-28',
-                 u'errorsincelastsuccessful': '',
-                 u'lastcollectionattempt': 'x2017-03-29-21:22',
-                 u'maxrawfilemtimearchived': 1490746201L}),
-            TestSync.FakeEntity(
-                u'rsync://utility.mlab.mlab4.prg01.'
-                'measurement-lab.org:7999/utilization',
-                {u'errorsincelastsuccessful': '',
-                 u'lastsuccessfulcollection': 'x2017-03-28',
-                 u'lastcollectionattempt': 'x2017-03-29-21:04',
-                 u'maxrawfilemtimearchived': 1490746202L}),
-            TestSync.FakeEntity(
-                u'rsync://utility.mlab.mlab4.sea02.'
-                'measurement-lab.org:7999/switch',
-                {u'lastcollectionattempt': 'x2017-03-29-15:46',
-                 u'errorsincelastsuccessful':
-                     '[2017-03-29 15:49:07,364 ERROR run_scraper.py:196] '
-                     'Scrape and upload failed: 1'})]
+            TestSync.FakeEntity(*data) for data in DATASTORE_DATA]
 
         self.mock_handler = mock.Mock(sync.WebHandler)
         self.mock_handler.wfile = StringIO.StringIO()
@@ -99,48 +141,73 @@ class TestSync(unittest.TestCase):
         self.assertIs(type(args.prometheus_port), int)
         self.assertIs(type(args.webserver_port), int)
 
-    @mock.patch.object(sync, 'datastore')
-    def test_get_fleet_data(self, mock_datastore):
-        mock_client = mock.Mock()
-        mock_datastore.Client.return_value = mock_client
-        mock_client.query().fetch.return_value = self.test_datastore_data
-
+    def test_get_fleet_data(self):
         returned_answers = sync.get_fleet_data('scraper')
-
         correct_answers = [
-            {u'dropboxrsyncaddress': u'rsync://utility.mlab.mlab4.prg01.'
-                                     'measurement-lab.org:7999/switch',
-             u'contact': '',
-             u'lastsuccessfulcollection': 'x2017-03-28',
-             u'errorsincelastsuccessful': '',
-             u'lastcollectionattempt': 'x2017-03-29-21:22',
-             u'maxrawfilemtimearchived': 1490746201L},
-            {u'dropboxrsyncaddress': u'rsync://utility.mlab.mlab4.prg01.'
-                                     'measurement-lab.org:7999/utilization',
-             u'contact': '',
-             u'errorsincelastsuccessful': '',
-             u'lastsuccessfulcollection': 'x2017-03-28',
-             u'lastcollectionattempt': 'x2017-03-29-21:04',
-             u'maxrawfilemtimearchived': 1490746202L},
-            {u'dropboxrsyncaddress': u'rsync://utility.mlab.mlab4.sea02'
-                                     '.measurement-lab.org:7999/switch',
-             u'contact': '',
-             u'errorsincelastsuccessful':
+            {'dropboxrsyncaddress': 'rsync://utility.mlab.mlab4.prg01.'
+                                    'measurement-lab.org:7999/switch',
+             'contact': '',
+             'lastsuccessfulcollection': 'x2017-03-28',
+             'errorsincelastsuccessful': '',
+             'lastcollectionattempt': 'x2017-03-29-21:22',
+             'maxrawfilemtimearchived': 1490746201L},
+            {'dropboxrsyncaddress': 'rsync://utility.mlab.mlab4.prg01.'
+                                    'measurement-lab.org:7999/utilization',
+             'contact': '',
+             'errorsincelastsuccessful': '',
+             'lastsuccessfulcollection': 'x2017-03-28',
+             'lastcollectionattempt': 'x2017-03-29-21:04',
+             'maxrawfilemtimearchived': 1490746202L},
+            {'dropboxrsyncaddress': 'rsync://utility.mlab.mlab4.sea02'
+                                    '.measurement-lab.org:7999/switch',
+             'contact': '',
+             'errorsincelastsuccessful':
                  '[2017-03-29 15:49:07,364 ERROR run_scraper.py:196] '
                  'Scrape and upload failed: 1',
-             u'lastsuccessfulcollection': '',
-             u'lastcollectionattempt': 'x2017-03-29-15:46',
-             u'maxrawfilemtimearchived': ''}]
+             'lastsuccessfulcollection': '',
+             'lastcollectionattempt': 'x2017-03-29-15:46',
+             'maxrawfilemtimearchived': ''}]
         self.assertItemsEqual(returned_answers, correct_answers)
 
-    @mock.patch.object(sync, 'datastore')
-    def test_do_get(self, mock_datastore):
-        mock_client = mock.Mock()
-        mock_datastore.Client.return_value = mock_client
-        mock_client.query().fetch.return_value = self.test_datastore_data
+    def test_get_fleet_data_subsets(self):
+        prg01_switch = {
+            'dropboxrsyncaddress': 'rsync://utility.mlab.mlab4.prg01.'
+                                   'measurement-lab.org:7999/switch',
+            'contact': '',
+            'lastsuccessfulcollection': 'x2017-03-28',
+            'errorsincelastsuccessful': '',
+            'lastcollectionattempt': 'x2017-03-29-21:22',
+            'maxrawfilemtimearchived': 1490746201L}
+        prg01_utilization = {
+            'dropboxrsyncaddress': 'rsync://utility.mlab.mlab4.prg01.'
+                                   'measurement-lab.org:7999/utilization',
+            'contact': '',
+            'errorsincelastsuccessful': '',
+            'lastsuccessfulcollection': 'x2017-03-28',
+            'lastcollectionattempt': 'x2017-03-29-21:04',
+            'maxrawfilemtimearchived': 1490746202L}
+        sea02_switch = {
+            'dropboxrsyncaddress': 'rsync://utility.mlab.mlab4.sea02'
+                                   '.measurement-lab.org:7999/switch',
+            'contact': '',
+            'errorsincelastsuccessful':
+                '[2017-03-29 15:49:07,364 ERROR run_scraper.py:196] '
+                'Scrape and upload failed: 1',
+            'lastsuccessfulcollection': '',
+            'lastcollectionattempt': 'x2017-03-29-15:46',
+            'maxrawfilemtimearchived': ''}
+        self.assertItemsEqual(
+            sync.get_fleet_data('scraper', 'sea02'),
+            [sea02_switch])
+        self.assertItemsEqual(
+            sync.get_fleet_data('scraper', 'prg01'),
+            [prg01_switch, prg01_utilization])
+        self.assertItemsEqual(
+            sync.get_fleet_data('scraper', 'switch'),
+            [sea02_switch, prg01_switch])
 
+    def test_do_get(self):
         sync.WebHandler.do_root_url(self.mock_handler)
-
         self.assertEqual(self.mock_handler.wfile.getvalue().count('<tr>'), 4)
 
     @mock.patch.object(sync, 'datastore')
@@ -167,12 +234,8 @@ class TestSync(unittest.TestCase):
     def test_docstring_exists(self):
         self.assertIsNotNone(sync.__doc__)
 
-    @mock.patch.object(sync, 'datastore')
     @testfixtures.log_capture()
-    def test_spreadsheet_empty_sheet(self, mock_datastore, log):
-        mock_client = mock.Mock()
-        mock_datastore.Client.return_value = mock_client
-        mock_client.query().fetch.return_value = self.test_datastore_data
+    def test_spreadsheet_empty_sheet(self, log):
         mock_service = mock.Mock()
         mock_service.spreadsheets().values().get().execute.return_value = {
             'values': []
@@ -193,18 +256,14 @@ class TestSync(unittest.TestCase):
         self.assertEqual(len(new_values), 4)
         self.assertIn('WARNING', [x.levelname for x in log.records])
 
-    @mock.patch.object(sync, 'datastore')
-    def test_spreadsheet_partly_filled(self, mock_datastore):
-        mock_client = mock.Mock()
-        mock_datastore.Client.return_value = mock_client
-        mock_client.query().fetch.return_value = self.test_datastore_data
+    def test_spreadsheet_partly_filled(self):
         mock_service = mock.Mock()
         mock_service.spreadsheets().values().get().execute.return_value = {
             'values': [sync.KEYS] +
-                      [[u'rsync://utility.mlab.mlab4.prg01.'
+                      [['rsync://utility.mlab.mlab4.prg01.'
                         'measurement-lab.org:7999/switch'] +
                        ['' for _ in range(len(sync.KEYS) - 1)],
-                       [u'rsync://test'] +
+                       ['rsync://test'] +
                        ['' for _ in range(len(sync.KEYS) - 1)]]
         }
         mock_service.spreadsheets().values().update().execute.return_value = {
@@ -222,12 +281,8 @@ class TestSync(unittest.TestCase):
         # One header row, three rows from datastore, one for rsync://test
         self.assertEqual(len(new_values), 5)
 
-    @mock.patch.object(sync, 'datastore')
     @testfixtures.log_capture()
-    def test_spreadsheet_update_fails(self, mock_datastore, log):
-        mock_client = mock.Mock()
-        mock_datastore.Client.return_value = mock_client
-        mock_client.query().fetch.return_value = self.test_datastore_data
+    def test_spreadsheet_update_fails(self, log):
         mock_service = mock.Mock()
         mock_service.spreadsheets().values().get().execute.return_value = {
             'values': [sync.KEYS] +
@@ -245,12 +300,8 @@ class TestSync(unittest.TestCase):
         mock_service.spreadsheets().values().update().execute.assert_called()
         self.assertIn('ERROR', [x.levelname for x in log.records])
 
-    @mock.patch.object(sync, 'datastore')
     @testfixtures.log_capture()
-    def test_spreadsheet_retrieve_fails(self, mock_datastore, log):
-        mock_client = mock.Mock()
-        mock_datastore.Client.return_value = mock_client
-        mock_client.query().fetch.return_value = self.test_datastore_data
+    def test_spreadsheet_retrieve_fails(self, log):
         mock_service = mock.Mock()
         mock_service.spreadsheets().values().get().execute.return_value = {}
 
@@ -268,12 +319,7 @@ class TestSync(unittest.TestCase):
         self.assertEqual(sync.parse_xdatetime('1970-1-1'), None)
         self.assertEqual(sync.parse_xdatetime('x1970-1-1 BADDATA'), None)
 
-    @mock.patch.object(sync, 'datastore')
-    def test_prometheus_forwarding(self, mock_datastore):
-        mock_client = mock.Mock()
-        mock_datastore.Client.return_value = mock_client
-        mock_client.query().fetch.return_value = self.test_datastore_data
-
+    def test_prometheus_forwarding(self):
         collector = sync.PrometheusDatastoreCollector('scraper')
         metrics = list(collector.collect())
         self.assertEqual(set(x.name for x in metrics),
@@ -298,13 +344,13 @@ class TestSync(unittest.TestCase):
         mock_client = mock.Mock()
         mock_datastore.Client.return_value = mock_client
         self.test_datastore_data.append(
-            TestSync.FakeEntity(u'rsync://badbad', {}))
+            TestSync.FakeEntity('rsync://badbad', {}))
         mock_client.query().fetch.return_value = self.test_datastore_data
 
         # Add a bad value to all of the good values returned by
         # get_deployed_rsync_urls().
         rsync_urls_with_bad_value_added = set([
-            u'rsync://badbad',
+            'rsync://badbad',
         ]).union(sync.get_deployed_rsync_urls('scraper'))
 
         # Make get_deployed_rsync_urls() return the set with the bad
@@ -337,11 +383,11 @@ class TestSync(unittest.TestCase):
         mock_datastore.Client.return_value = mock_client
         self.test_datastore_data.append(
             TestSync.FakeEntity(
-                u'rsync://ndt.iupui.mlab4.lhr01.measurement-lab.org:7999/ndt',
-                {u'lastsuccessfulcollection': 'x2017-03-28',
-                 u'errorsincelastsuccessful': '',
-                 u'lastcollectionattempt': 'x2017-03-29-21:22',
-                 u'maxrawfilemtimearchived': 1490746201L}))
+                'rsync://ndt.iupui.mlab4.lhr01.measurement-lab.org:7999/ndt',
+                {'lastsuccessfulcollection': 'x2017-03-28',
+                 'errorsincelastsuccessful': '',
+                 'lastcollectionattempt': 'x2017-03-29-21:22',
+                 'maxrawfilemtimearchived': 1490746201L}))
         mock_client.query().fetch.return_value = self.test_datastore_data
 
         collector = sync.PrometheusDatastoreCollector('scraper')
@@ -387,23 +433,23 @@ class TestSync(unittest.TestCase):
         args = []
 
         @sync.timed_cache(hours=1)
-        def should_be_only_run_once_per_arg(arg):
+        def max_once_per_arg_per_hour(arg):
             args.append(arg)
             return len(args)
 
         with freezegun.freeze_time('2016-10-26 18:10:00 UTC') as frozen_time:
-            self.assertEqual(should_be_only_run_once_per_arg('hello'), 1)
+            self.assertEqual(max_once_per_arg_per_hour('hello'), 1)
             self.assertEqual(['hello'], args)
-            self.assertEqual(should_be_only_run_once_per_arg('hello'), 1)
+            self.assertEqual(max_once_per_arg_per_hour('hello'), 1)
             self.assertEqual(['hello'], args)
-            self.assertEqual(should_be_only_run_once_per_arg('bye'), 2)
+            self.assertEqual(max_once_per_arg_per_hour('bye'), 2)
             self.assertEqual(['hello', 'bye'], args)
 
             frozen_time.tick(datetime.timedelta(hours=2))
 
-            self.assertEqual(should_be_only_run_once_per_arg('hello'), 3)
+            self.assertEqual(max_once_per_arg_per_hour('hello'), 3)
             self.assertEqual(['hello', 'bye', 'hello'], args)
-            self.assertEqual(should_be_only_run_once_per_arg('hello'), 3)
+            self.assertEqual(max_once_per_arg_per_hour('hello'), 3)
             self.assertEqual(['hello', 'bye', 'hello'], args)
 
     def test_deployed_rsync_urls(self):
@@ -430,11 +476,7 @@ class TestSync(unittest.TestCase):
         sync.WebHandler.do_GET(self.mock_handler)
         self.assertEqual(self.mock_handler.send_error.call_count, 1)
 
-    @mock.patch.object(sync, 'datastore')
-    def test_do_scraper_status_bad_args(self, mock_datastore):
-        mock_client = mock.Mock()
-        mock_datastore.Client.return_value = mock_client
-        mock_client.query().fetch.return_value = self.test_datastore_data
+    def test_do_scraper_status_bad_args(self):
         sync.WebHandler.do_scraper_status(self.mock_handler, 'f=g')
         result = json.loads(self.mock_handler.wfile.getvalue())['result']
         self.assertEqual(len(result), 3)

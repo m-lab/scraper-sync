@@ -9,5 +9,5 @@ set -e
 
 docker build . -f Dockerfile -t sync
 docker build . -f TestDockerfile -t synctest
-docker run -v `pwd`:/test -w /test synctest ./git-hooks/python-pre-commit
+docker run -v `pwd`:/test -w /test synctest ./test.sh
 rm -f *.pyc
