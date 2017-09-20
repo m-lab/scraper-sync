@@ -9,5 +9,5 @@ set -e
 
 docker build . -f Dockerfile -t sync
 docker build . -f TestDockerfile -t synctest
-docker run -v `pwd`:/test -w /test synctest ./test.sh
+docker run -v `pwd`:/test -w /test synctest ./test_for_inside_container.sh
 rm -f *.pyc

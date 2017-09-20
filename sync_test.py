@@ -481,6 +481,12 @@ class TestSync(unittest.TestCase):
         result = json.loads(self.mock_handler.wfile.getvalue())['result']
         self.assertEqual(len(result), 3)
 
+    def test_do_scraper_status_sea02(self):
+        self.mock_handler.namespace = 'test'
+        sync.WebHandler.do_scraper_status(self.mock_handler, 'rsync_url=sea02')
+        result = json.loads(self.mock_handler.wfile.getvalue())['result']
+        self.assertEqual(len(result), 1)
+
 
 if __name__ == '__main__':  # pragma: no cover
     unittest.main()

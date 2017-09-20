@@ -267,7 +267,11 @@ class WebHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         self.send_header('Content-type', 'application/json')
         self.end_headers()
         data = urlparse.parse_qs(query_string)
-        rsync_url_fragment = data.get('rsync_url', '')
+        rsync_url_fragment = data.get('rsync_url', [])
+        if rsync_url_fragment:
+            rsync_url_fragment = rsync_url_fragment[0]
+        else:
+            rsync_url_fragment = ''
         endpoints = get_fleet_data(WebHandler.namespace, rsync_url_fragment)
         # The JSON should always encode a non-empty object (not string or array)
         # for reasons described here:
