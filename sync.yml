@@ -1,3 +1,20 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: scraper-sync-public-service
+  annotations:
+    prometheus.io/scrape: 'true'
+    prometheus.io/port: '9090'
+spec:
+  selector:
+    application: scraper-sync
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+  sessionAffinity: None
+  type: LoadBalancer
+---
 kind: Deployment
 apiVersion: extensions/v1beta1
 metadata:
@@ -15,7 +32,8 @@ spec:
       labels:
         application: scraper-sync
     spec:
-      # Scraper nodes have sheets permission scopes
+      # Scraper nodes have sheets permission scopes, and we need sheets
+      # permissions to write to the spreadsheet.
       nodeSelector:
         scraper-node: 'true'
       containers:

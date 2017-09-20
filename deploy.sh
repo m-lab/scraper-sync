@@ -104,7 +104,7 @@ else
   exit 1
 fi
 
-cp deploy.yml deployment
+cp sync.yml deployment
 
 if [[ $2 == travis ]]; then
   gcloud auth activate-service-account --key-file ${KEY_FILE}
