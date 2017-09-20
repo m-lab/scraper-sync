@@ -9,5 +9,7 @@ set -e
 
 docker build . -f Dockerfile -t sync
 docker build . -f TestDockerfile -t synctest
+# Keep the full-path filenames consistent inside and outside the container in an
+# effort to not confuse code coverage tools.
 docker run -v `pwd`:`pwd` -w `pwd` synctest ./test_for_inside_container.sh
 rm -f *.pyc
