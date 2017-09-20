@@ -1,7 +1,9 @@
 FROM sync
+# Install the libraries that are only for test code or the datastore emulator.
 RUN apk add git libffi-dev openssl-dev curl openjdk8
 ADD test-requirements.txt /test-requirements.txt
 RUN pip install -r /test-requirements.txt
+# Install the datastore emulator
 ADD travis/install_gcloud.sh /install_gcloud.sh
 RUN chmod +x /install_gcloud.sh
 RUN /install_gcloud.sh cloud-datastore-emulator beta

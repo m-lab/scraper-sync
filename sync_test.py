@@ -45,18 +45,13 @@ class EmulatorCreds(google.auth.credentials.Credentials):
 
     Used to avoid the need for auth entirely when using local versions of cloud
     services.
+
+    Based on:
+       https://github.com/GoogleCloudPlatform/google-cloud-python/blob/3caed41b88eb58673ee5c3396afa3f8fff97d4d4/test_utils/test_utils/system.py#L33
     """
 
-    # Some random methods need to get overwritten for this to work. Put them
-    # between the two "arguments-differ" directives for maximal flexibility.
-    # pylint: disable=arguments-differ
-    def refresh(self, *_args, **_kwargs):  # pragma: no cover
-        return
-    # pylint: enable=arguments-differ
-
-    @staticmethod
-    def create_scoped_required():  # pragma: no cover
-        return False
+    def refresh(self, _request):  # pragma: no cover
+        raise RuntimeError('Should never be called.')
 
 
 DATASTORE_DATA = [
@@ -463,12 +458,12 @@ class TestSync(unittest.TestCase):
         self.assertEqual(self.mock_handler.do_root_url.call_count, 1)
 
     def test_do_get_json_status(self):
-        self.mock_handler.path = '/json_status?rsync_url=thing'
+        self.mock_handler.path = '/json_status?rsync_filter=thing'
         self.assertEqual(self.mock_handler.do_scraper_status.call_count, 0)
         sync.WebHandler.do_GET(self.mock_handler)
         self.assertEqual(self.mock_handler.do_scraper_status.call_count, 1)
         self.assertEqual(self.mock_handler.do_scraper_status.call_args[0],
-                         ('rsync_url=thing',))
+                         ('rsync_filter=thing',))
 
     def test_do_404_on_bad_urls(self):
         self.mock_handler.path = 'BAD'
@@ -483,7 +478,8 @@ class TestSync(unittest.TestCase):
 
     def test_do_scraper_status_sea02(self):
         self.mock_handler.namespace = 'test'
-        sync.WebHandler.do_scraper_status(self.mock_handler, 'rsync_url=sea02')
+        sync.WebHandler.do_scraper_status(self.mock_handler,
+                                          'rsync_filter=sea02')
         result = json.loads(self.mock_handler.wfile.getvalue())['result']
         self.assertEqual(len(result), 1)
 

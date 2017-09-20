@@ -255,7 +255,7 @@ class WebHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         """Give the status, in JSON form, of the specified rsync endpoints.
 
         This returns a JSON list of JSON objects, because it will return the
-        status of all endpoints that contain a substring of the rsync_url
+        status of all endpoints that contain a substring of the rsync_filter
         argument value.  If no such argument exists, or it is the empty string,
         or anything else goes wrong with the parsing, then this will return the
         status of every endpoint with status in cloud datastore.
@@ -267,7 +267,7 @@ class WebHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         self.send_header('Content-type', 'application/json')
         self.end_headers()
         data = urlparse.parse_qs(query_string)
-        rsync_url_fragment = data.get('rsync_url', [])
+        rsync_url_fragment = data.get('rsync_filter', [])
         if rsync_url_fragment:
             rsync_url_fragment = rsync_url_fragment[0]
         else:
