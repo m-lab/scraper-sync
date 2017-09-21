@@ -8,10 +8,6 @@ metadata:
 spec:
   selector:
     application: scraper-sync
-  ports:
-  - protocol: TCP
-    port: 80
-    targetPort: 80
   sessionAffinity: None
   type: ClusterIP
   externalIPs:
