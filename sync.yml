@@ -48,4 +48,4 @@ spec:
               value: '{{SPREADSHEET_ID}}'
           ports:
             - containerPort: 80
-              containerPort: 9090
+            - containerPort: 9090
