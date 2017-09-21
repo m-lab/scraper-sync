@@ -68,6 +68,7 @@ if [[ "$1" == production ]]; then
   DATASTORE_NAMESPACE=scraper
   CLUSTER=scraper-cluster
   ZONE=us-central1-a
+  EXTERNAL_IP=35.193.213.113
   if git_is_dirty ; then
     echo "We won't deploy to production with uncommitted changes"
     exit 1
@@ -100,6 +101,8 @@ elif [[ "$1" == sandbox-* ]]; then
   # choose one.
   CLUSTER=scraper-cluster-${SANDBOXSUFFIX}
   ZONE=us-central1-a
+  # The EXTERNAL_IP value will be inherited from the calling environment for
+  # sandbox
 else
   echo "BAD ARGUMENT TO $0"
   exit 1
