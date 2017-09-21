@@ -8,10 +8,14 @@ metadata:
 spec:
   selector:
     application: scraper-sync
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
   sessionAffinity: None
-  type: ClusterIP
   externalIPs:
     - {{EXTERNAL_IP}}
+  type: ClusterIP
 ---
 kind: Deployment
 apiVersion: extensions/v1beta1
@@ -43,4 +47,5 @@ spec:
             - name: SPREADSHEET
               value: '{{SPREADSHEET_ID}}'
           ports:
-            - containerPort: 9090
+            - containerPort: 80
+              containerPort: 9090
