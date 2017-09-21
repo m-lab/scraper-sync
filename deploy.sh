@@ -79,6 +79,7 @@ elif [[ "$1" == staging ]]; then
   DATASTORE_NAMESPACE=scraper
   CLUSTER=scraper-cluster
   ZONE=us-central1-a
+  EXTERNAL_IP=35.185.76.159
   if git_is_dirty ; then
     echo "We won't deploy to staging with uncommitted changes"
     exit 1
@@ -110,12 +111,13 @@ if [[ $2 == travis ]]; then
   gcloud auth activate-service-account --key-file ${KEY_FILE}
 fi
 
-# Configure the last pieces of deploy.yml
+# Configure the last pieces of the .yml files
 ./travis/substitute_values.sh deployment \
   IMAGE_URL gcr.io/${PROJECT}/github-m-lab-scraper-sync:${GIT_COMMIT} \
   SPREADSHEET_ID ${SHEET_ID} \
   NAMESPACE ${DATASTORE_NAMESPACE} \
-  GITHUB_COMMIT http://github.com/m-lab/scraper-sync/tree/${GIT_COMMIT}
+  GITHUB_COMMIT http://github.com/m-lab/scraper-sync/tree/${GIT_COMMIT} \
+  EXTERNAL_IP ${EXTERNAL_IP}
 
 # Build the image and push it to GCR
 ./travis/build_and_push_container.sh \
