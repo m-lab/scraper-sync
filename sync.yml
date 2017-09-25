@@ -1,3 +1,27 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: scraper-sync-public-service
+  annotations:
+    prometheus.io/scrape: 'true'
+    prometheus.io/port: '9090'
+spec:
+  selector:
+    application: scraper-sync
+  ports:
+  - protocol: TCP
+    name: http
+    port: 80
+    targetPort: 80
+  - protocol: TCP
+    name: prometheus
+    port: 9090
+    targetPort: 9090
+  sessionAffinity: None
+  externalIPs:
+    - {{EXTERNAL_IP}}
+  type: ClusterIP
+---
 kind: Deployment
 apiVersion: extensions/v1beta1
 metadata:
@@ -15,7 +39,9 @@ spec:
       labels:
         application: scraper-sync
     spec:
-      # Scraper nodes have sheets permission scopes
+      # Scraper nodes have sheets permission scopes, and we need sheets
+      # permissions to write to the spreadsheet.
+      # TODO(https://github.com/m-lab/scraper-sync/issues/40)
       nodeSelector:
         scraper-node: 'true'
       containers:
@@ -27,4 +53,5 @@ spec:
             - name: SPREADSHEET
               value: '{{SPREADSHEET_ID}}'
           ports:
+            - containerPort: 80
             - containerPort: 9090
