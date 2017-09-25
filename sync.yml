@@ -10,9 +10,11 @@ spec:
     application: scraper-sync
   ports:
   - protocol: TCP
+    name: http
     port: 80
     targetPort: 80
   - protocol: TCP
+    name: prometheus
     port: 9090
     targetPort: 9090
   sessionAffinity: None
