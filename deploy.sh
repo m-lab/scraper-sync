@@ -80,7 +80,7 @@ elif [[ "$1" == staging ]]; then
   DATASTORE_NAMESPACE=scraper
   CLUSTER=scraper-cluster
   ZONE=us-central1-a
-  EXTERNAL_IP=35.185.76.159
+  EXTERNAL_IP=35.184.20.213
   if git_is_dirty ; then
     echo "We won't deploy to staging with uncommitted changes"
     exit 1

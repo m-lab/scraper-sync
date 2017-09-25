@@ -12,6 +12,9 @@ spec:
   - protocol: TCP
     port: 80
     targetPort: 80
+  - protocol: TCP
+    port: 9090
+    targetPort: 9090
   sessionAffinity: None
   externalIPs:
     - {{EXTERNAL_IP}}
@@ -36,6 +39,7 @@ spec:
     spec:
       # Scraper nodes have sheets permission scopes, and we need sheets
       # permissions to write to the spreadsheet.
+      # TODO(https://github.com/m-lab/scraper-sync/issues/40)
       nodeSelector:
         scraper-node: 'true'
       containers:
