@@ -43,7 +43,7 @@ spec:
       # permissions to write to the spreadsheet.
       # TODO(https://github.com/m-lab/scraper-sync/issues/40)
       nodeSelector:
-        scraper-node: 'true'
+        scraper-sync-node: 'true'
       containers:
         - name: scraper-sync
           image: '{{IMAGE_URL}}'
