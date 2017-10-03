@@ -52,6 +52,13 @@ spec:
               value: '{{NAMESPACE}}'
             - name: SPREADSHEET
               value: '{{SPREADSHEET_ID}}'
+          resources:
+            requests:
+              memory: "5Gi"
+              cpu: "4"
+            limits:
+              memory: "8Gi"
+              cpu: "8"
           ports:
             - containerPort: 80
             - containerPort: 9090
