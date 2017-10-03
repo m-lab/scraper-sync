@@ -88,6 +88,10 @@ SUCCESS = prometheus_client.Counter(
     'spreadsheet_sync_success',
     'How many times has the sheet update succeeded and failed',
     ['message'])
+REQUESTS = prometheus_client.Counter(
+    'requests',
+    'Count of web server requests',
+    ['message'])  # e.g. json, root, metrics, ...
 
 
 class SyncException(Exception):
@@ -190,10 +194,12 @@ class WebHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         elif parsed_path.path == '/json_status':
             self.do_scraper_status(parsed_path.query)
         else:
+            REQUESTS.labels(message='request_error').inc()
             self.send_error(404)
 
     def do_root_url(self):
         """Draw a table when a request comes in for '/'."""
+        REQUESTS.labels(message='root url').inc()
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
@@ -263,6 +269,7 @@ class WebHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         Args:
           query_string: the URL query string, not yet parsed.
         """
+        REQUESTS.labels(message='json').inc()
         self.send_response(200)
         self.send_header('Content-type', 'application/json')
         self.end_headers()
@@ -489,6 +496,8 @@ class PrometheusDatastoreCollector(object):
 
     def collect(self):
         """Get the data from cloud datastore and yield a series of metrics."""
+        REQUESTS.labels(message='collect').inc()
+
         last_success = prometheus_client.core.GaugeMetricFamily(
             'scraper_lastsuccessfulcollection',
             'Time of the last successful collection',
