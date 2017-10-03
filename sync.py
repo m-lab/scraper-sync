@@ -88,6 +88,7 @@ SUCCESS = prometheus_client.Counter(
     'spreadsheet_sync_success',
     'How many times has the sheet update succeeded and failed',
     ['message'])
+# TODO(gfr) Upgrade this to a histogram.
 REQUESTS = prometheus_client.Counter(
     'requests',
     'Count of web server requests',
