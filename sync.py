@@ -13,16 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""This program uploads the status in cloud datastore to a spreadsheet.
+"""This program presents the cloud dtatastore status to the fleet.
 
-Nodes in the MLab fleet use a spreadsheet to determine what data is and is not
-safe to delete. Unfortunately, if every scraper just wrote to that spreadsheet,
-then we would quickly run out of spreadsheet API quota.  Also, the spreadsheet
-is kind of a janky hack for what really should be a key-value store. The new
-scraper has its source of truth in a key-value store (Google Cloud Datastore),
-and this program has the job of updating the spreadsheet with that truth.  In a
-longer term migration, this script and the spreadsheet should both be
-eliminated, and the scripts in charge of data deletion should read from a
+This is a webserver that reads from cloud datastore and presents the requested
+information in json form.
+
+Nodes in the MLab fleet used to use a spreadsheet to determine what data is and
+is not safe to delete. Unfortunately, if every scraper just wrote to that
+spreadsheet, then we would quickly run out of spreadsheet API quota.  Also, the
+spreadsheet is kind of a janky hack for what really should be a key-value store.
+The new scraper has its source of truth in a key-value store (Google Cloud
+Datastore), and this program has the job of updating the spreadsheet with that
+truth.  In a longer term migration, this script and the spreadsheet should both
+be eliminated, and the scripts in charge of data deletion should read from a
 low-latency source of cloud datastore data.
 
 This program needs to be run on a GCE instance that has access to the Sheets
@@ -166,8 +169,46 @@ def status_to_dict(status_entity):
         answer[k] = status_entity.get(k, '')
     return answer
 
+
+# A datatype to hold cached data for timed_cache
+CachedData = collections.namedtuple('CachedData', ['expiration', 'value'])
+
+
+def timed_cache(**kwargs):
+    """A decorator that caches a functions results for a set period of time.
+
+    Should be part of the stdlib, and actually is part of it in Python 3+.  Adds
+    a 'nocache' argument to the kwargs of the constructed function, so be
+    careful that this does not override an existing argument.
+
+    The cache ignores keyword arguments.  TODO(make the cache smarter)
+    """
+    timeout = datetime.timedelta(**kwargs)
+
+    def cacher(func):
+        """The actual function that is applied to decorate the function."""
+        cache = {}
+
+        def cached_func(*args, **kwargs):
+            """A cached version of the passed-in function."""
+            current = datetime.datetime.now()
+            if 'nocache' in kwargs or \
+                    args not in cache or \
+                    cache[args].expiration < current:
+                cache[args] = CachedData(expiration=current + timeout,
+                                         value=func(*args))
+            return cache[args].value
+
+        # Add a clear_cache method to the returned function object to aid in
+        # testing.  Code not in a test.py file should not use this method.
+        cached_func.clear_cache = cache.clear
+        return cached_func
+    return cacher
+
+
+@timed_cache(seconds=30)
 @DATASTORE_TIMES.time()
-def get_fleet_data(namespace, rsync_url_fragment=None):
+def get_fleet_data(namespace):
     """Returns a list of dictionaries, one for every entry requested.
 
     Each status has a dropboxrsyncaddress that contains rsync_url_fragment as a
@@ -175,16 +216,7 @@ def get_fleet_data(namespace, rsync_url_fragment=None):
     """
     datastore_client = datastore.Client(namespace=namespace)
     query = datastore_client.query(kind='dropboxrsyncaddress')
-    if rsync_url_fragment:
-        # Request all keys, filter down, then request full entities only for the
-        # relevant keys.  Should save us load on cloud datastore.
-        query.keys_only()
-        keys = [x.key for x in query.fetch()
-                if rsync_url_fragment in x.key.name]
-        statuses = datastore_client.get_multi(keys)
-    else:
-        # Special case when all data is requested
-        statuses = query.fetch()
+    statuses = query.fetch()
     return [status_to_dict(status) for status in statuses]
 
 
@@ -287,7 +319,8 @@ class WebHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             rsync_url_fragment = rsync_url_fragment[0]
         else:
             rsync_url_fragment = ''
-        endpoints = get_fleet_data(WebHandler.namespace, rsync_url_fragment)
+        endpoints = [entry for entry in get_fleet_data(WebHandler.namespace)
+                     if rsync_url_fragment in entry['dropboxrsyncaddress']]
         # The JSON should always encode a non-empty object (not string or array)
         # for reasons described here:
         #   https://www.owasp.org/index.php/AJAX_Security_Cheat_Sheet
@@ -431,32 +464,6 @@ def deconstruct_rsync_url(rsync_url):
         return None
     else:
         return match.group(1), match.group(2), match.group(3)
-
-
-# A datatype to hold cached data for timed_cache
-CachedData = collections.namedtuple('CachedData', ['expiration', 'value'])
-
-
-def timed_cache(**kwargs):
-    """A decorator that caches a functions results for a set period of time.
-
-    Should be part of the stdlib, and actually is part of it in Python 3+.
-    """
-    timeout = datetime.timedelta(**kwargs)
-
-    def cacher(func):
-        """The actual function that is applied to decorate the function."""
-        cache = {}
-
-        def cached_func(*args):
-            """A cached version of the passed-in function."""
-            current = datetime.datetime.now()
-            if args not in cache or cache[args].expiration < current:
-                cache[args] = CachedData(expiration=current + timeout,
-                                         value=func(*args))
-            return cache[args].value
-        return cached_func
-    return cacher
 
 
 @timed_cache(hours=1)
