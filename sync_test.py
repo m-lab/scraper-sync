@@ -114,6 +114,7 @@ class TestSync(unittest.TestCase):
         self.mock_handler = mock.Mock(sync.WebHandler)
         self.mock_handler.wfile = StringIO.StringIO()
         self.mock_handler.client_address = (1234, '127.0.0.1')
+        sync.get_fleet_data.clear_cache()
 
     def tearDown(self):
         self.json_patcher.stop()
@@ -165,22 +166,6 @@ class TestSync(unittest.TestCase):
         self.assertItemsEqual(returned_answers, correct_answers)
 
     def test_get_fleet_data_subsets(self):
-        prg01_switch = {
-            'dropboxrsyncaddress': 'rsync://utility.mlab.mlab4.prg01.'
-                                   'measurement-lab.org:7999/switch',
-            'contact': '',
-            'lastsuccessfulcollection': 'x2017-03-28',
-            'errorsincelastsuccessful': '',
-            'lastcollectionattempt': 'x2017-03-29-21:22',
-            'maxrawfilemtimearchived': 1490746201L}
-        prg01_utilization = {
-            'dropboxrsyncaddress': 'rsync://utility.mlab.mlab4.prg01.'
-                                   'measurement-lab.org:7999/utilization',
-            'contact': '',
-            'errorsincelastsuccessful': '',
-            'lastsuccessfulcollection': 'x2017-03-28',
-            'lastcollectionattempt': 'x2017-03-29-21:04',
-            'maxrawfilemtimearchived': 1490746202L}
         sea02_switch = {
             'dropboxrsyncaddress': 'rsync://utility.mlab.mlab4.sea02'
                                    '.measurement-lab.org:7999/switch',
@@ -191,15 +176,9 @@ class TestSync(unittest.TestCase):
             'lastsuccessfulcollection': '',
             'lastcollectionattempt': 'x2017-03-29-15:46',
             'maxrawfilemtimearchived': ''}
-        self.assertItemsEqual(
-            sync.get_fleet_data('scraper', 'sea02'),
-            [sea02_switch])
-        self.assertItemsEqual(
-            sync.get_fleet_data('scraper', 'prg01'),
-            [prg01_switch, prg01_utilization])
-        self.assertItemsEqual(
-            sync.get_fleet_data('scraper', 'switch'),
-            [sea02_switch, prg01_switch])
+        sea02_only = [x for x in sync.get_fleet_data('scraper')
+                      if 'sea02' in x['dropboxrsyncaddress']]
+        self.assertItemsEqual(sea02_only, [sea02_switch])
 
     def test_do_get(self):
         sync.WebHandler.do_root_url(self.mock_handler)
@@ -446,6 +425,28 @@ class TestSync(unittest.TestCase):
             self.assertEqual(['hello', 'bye', 'hello'], args)
             self.assertEqual(max_once_per_arg_per_hour('hello'), 3)
             self.assertEqual(['hello', 'bye', 'hello'], args)
+
+    def test_timed_cache_nocache_kwarg(self):
+        args = []
+
+        @sync.timed_cache(hours=1)
+        def max_once_per_arg_per_hour(arg):
+            args.append(arg)
+            return len(args)
+
+        with freezegun.freeze_time('2016-10-26 18:10:00 UTC'):
+            # Put 'hello' in the cache.
+            self.assertEqual(max_once_per_arg_per_hour('hello'), 1)
+            self.assertEqual(['hello'], args)
+            # The nocache keyword argument should cause the cache to be ignored
+            # pylint: disable=unexpected-keyword-arg
+            self.assertEqual(max_once_per_arg_per_hour('hello', nocache=True),
+                             2)
+            # pylint: enable=unexpected-keyword-arg
+            self.assertEqual(['hello', 'hello'], args)
+            # ...but that should not effect the caching of future calls.
+            self.assertEqual(max_once_per_arg_per_hour('hello'), 2)
+            self.assertEqual(['hello', 'hello'], args)
 
     def test_deployed_rsync_urls(self):
         urls = sync.get_deployed_rsync_urls('scraper')
