@@ -69,7 +69,7 @@ from oauth2client.contrib import gce
 # multi-hour bucket or two.  The precise choice of bucket values below is a
 # compromise between exponentially-sized bucket growth and a desire to make
 # sure that the bucket sizes are nice round time units.
-TIME_BUCKETS = (1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0, 600.0,
+TIME_BUCKETS = (0.0, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0, 600.0,
                 1800.0, 3600.0, 7200.0, float('inf'))
 
 # The monitoring variables exported by the prometheus_client
@@ -88,12 +88,19 @@ SUCCESS = prometheus_client.Counter(
     'spreadsheet_sync_success',
     'How many times has the sheet update succeeded and failed',
     ['message'])
-# TODO(gfr) Upgrade this to a histogram.
-REQUESTS = prometheus_client.Counter(
-    'requests',
-    'Count of web server requests',
+REQUEST_TIMES = prometheus_client.Histogram(
+    'request_time_seconds',
+    'Running time of web server requests',
     ['message'])  # e.g. json, root, metrics, ...
+REQUEST_TIMES_JSON = REQUEST_TIMES.labels(message='json')
+REQUEST_TIMES_ROOT_URL = REQUEST_TIMES.labels(message='root_url')
+REQUEST_TIMES_COLLECT = REQUEST_TIMES.labels(message='collect')
+REQUEST_TIMES_ERROR = REQUEST_TIMES.labels(message='error')
 
+# pylint: disable=no-value-for-parameter
+DATASTORE_TIMES = prometheus_client.Histogram(
+    'datastore_time_seconds',
+    'Running time of datastore requests')
 
 class SyncException(Exception):
     """The exceptions this system raises."""
@@ -159,7 +166,7 @@ def status_to_dict(status_entity):
         answer[k] = status_entity.get(k, '')
     return answer
 
-
+@DATASTORE_TIMES.time()
 def get_fleet_data(namespace, rsync_url_fragment=None):
     """Returns a list of dictionaries, one for every entry requested.
 
@@ -195,12 +202,12 @@ class WebHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         elif parsed_path.path == '/json_status':
             self.do_scraper_status(parsed_path.query)
         else:
-            REQUESTS.labels(message='request_error').inc()
+#            with REQUEST_TIMES.time()
             self.send_error(404)
 
+    @REQUEST_TIMES_ROOT_URL.time()
     def do_root_url(self):
         """Draw a table when a request comes in for '/'."""
-        REQUESTS.labels(message='root url').inc()
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
@@ -258,6 +265,7 @@ class WebHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         print >> self.wfile, '    </small></center>'
         print >> self.wfile, '</body></html>'
 
+    @REQUEST_TIMES_JSON.time()
     def do_scraper_status(self, query_string):
         """Give the status, in JSON form, of the specified rsync endpoints.
 
@@ -270,7 +278,6 @@ class WebHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         Args:
           query_string: the URL query string, not yet parsed.
         """
-        REQUESTS.labels(message='json').inc()
         self.send_response(200)
         self.send_header('Content-type', 'application/json')
         self.end_headers()
@@ -495,9 +502,9 @@ class PrometheusDatastoreCollector(object):
     def __init__(self, namespace):
         self.namespace = namespace
 
+    @REQUEST_TIMES_COLLECT.time()
     def collect(self):
         """Get the data from cloud datastore and yield a series of metrics."""
-        REQUESTS.labels(message='collect').inc()
 
         last_success = prometheus_client.core.GaugeMetricFamily(
             'scraper_lastsuccessfulcollection',
