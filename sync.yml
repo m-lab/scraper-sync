@@ -54,11 +54,11 @@ spec:
               value: '{{SPREADSHEET_ID}}'
           resources:
             requests:
-              memory: "5Gi"
-              cpu: "4"
+              memory: "1Gi"
+              cpu: "1"
             limits:
-              memory: "7Gi"
-              cpu: "7"
+              memory: "1Gi"
+              cpu: "1"
           ports:
             - containerPort: 80
             - containerPort: 9090
