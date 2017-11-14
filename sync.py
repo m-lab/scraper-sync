@@ -52,6 +52,7 @@ import ssl
 import sys
 import textwrap
 import thread
+import threading
 import time
 import traceback
 import urlparse
@@ -104,6 +105,7 @@ REQUEST_TIMES_ERROR = REQUEST_TIMES.labels(message='error')
 DATASTORE_TIMES = prometheus_client.Histogram(
     'datastore_time_seconds',
     'Running time of datastore requests')
+
 
 class SyncException(Exception):
     """The exceptions this system raises."""
@@ -170,11 +172,11 @@ def status_to_dict(status_entity):
     return answer
 
 
-# A datatype to hold cached data for timed_cache
+# A datatype to hold cached data for timed_locking_cache
 CachedData = collections.namedtuple('CachedData', ['expiration', 'value'])
 
 
-def timed_cache(**kwargs):
+def timed_locking_cache(**kwargs):
     """A decorator that caches a functions results for a set period of time.
 
     Should be part of the stdlib, and actually is part of it in Python 3+.  Adds
@@ -188,25 +190,29 @@ def timed_cache(**kwargs):
     def cacher(func):
         """The actual function that is applied to decorate the function."""
         cache = {}
+        lock = threading.RLock()
 
         def cached_func(*args, **kwargs):
             """A cached version of the passed-in function."""
+            lock.acquire()
             current = datetime.datetime.now()
             if 'nocache' in kwargs or \
                     args not in cache or \
                     cache[args].expiration < current:
                 cache[args] = CachedData(expiration=current + timeout,
                                          value=func(*args))
-            return cache[args].value
+            value = cache[args].value
+            lock.release()
+            return value
 
         # Add a clear_cache method to the returned function object to aid in
-        # testing.  Code not in a test.py file should not use this method.
+        # testing.  Code not in a *_test.py file should not use this method.
         cached_func.clear_cache = cache.clear
         return cached_func
     return cacher
 
 
-@timed_cache(seconds=30)
+@timed_locking_cache(seconds=30)
 @DATASTORE_TIMES.time()
 def get_fleet_data(namespace):
     """Returns a list of dictionaries, one for every entry requested.
@@ -234,8 +240,8 @@ class WebHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         elif parsed_path.path == '/json_status':
             self.do_scraper_status(parsed_path.query)
         else:
-#            with REQUEST_TIMES.time()
-            self.send_error(404)
+            with REQUEST_TIMES_ERROR.time():
+                self.send_error(404)
 
     @REQUEST_TIMES_ROOT_URL.time()
     def do_root_url(self):
@@ -466,7 +472,7 @@ def deconstruct_rsync_url(rsync_url):
         return match.group(1), match.group(2), match.group(3)
 
 
-@timed_cache(hours=1)
+@timed_locking_cache(hours=1)
 def get_kubernetes_json():  # pragma: no cover
     """Get the status of the system, in JSON, from the kubernetes server."""
     context = ssl.create_default_context()
