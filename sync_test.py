@@ -403,10 +403,10 @@ class TestSync(unittest.TestCase):
                       ':7999/utilization',
                       sync.get_deployed_rsync_urls('scraper'))
 
-    def test_timed_cache(self):
+    def test_timed_locking_cache(self):
         args = []
 
-        @sync.timed_cache(hours=1)
+        @sync.timed_locking_cache(hours=1)
         def max_once_per_arg_per_hour(arg):
             args.append(arg)
             return len(args)
@@ -426,10 +426,10 @@ class TestSync(unittest.TestCase):
             self.assertEqual(max_once_per_arg_per_hour('hello'), 3)
             self.assertEqual(['hello', 'bye', 'hello'], args)
 
-    def test_timed_cache_nocache_kwarg(self):
+    def test_timed_locking_cache_nocache_kwarg(self):
         args = []
 
-        @sync.timed_cache(hours=1)
+        @sync.timed_locking_cache(hours=1)
         def max_once_per_arg_per_hour(arg):
             args.append(arg)
             return len(args)
