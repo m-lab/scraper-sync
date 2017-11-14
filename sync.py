@@ -181,7 +181,10 @@ def timed_locking_cache(**kwargs):
 
     Should be part of the stdlib, and actually is part of it in Python 3+.  Adds
     a 'nocache' argument to the kwargs of the constructed function, so be
-    careful that this does not override an existing argument.
+    careful that this does not override an existing argument.  The lock is
+    acquired to prevent multiple threads from calling the (presumably expensive)
+    cached function simultaneously.  A smarter system would have finer-grained
+    locking, but that level of intelligence is not required here.
 
     The cache ignores keyword arguments.  TODO(make the cache smarter)
     """

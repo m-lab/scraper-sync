@@ -1,4 +1,4 @@
-FROM alpine:latest
+FROM alpine:3.6
 MAINTAINER Peter Boothe <pboothe@google.com>
 # Install all the standard packages we need
 RUN apk update && apk add python python-dev py2-pip gcc g++ libc-dev bash
