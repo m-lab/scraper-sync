@@ -1,8 +1,7 @@
-FROM alpine:3.6
+FROM alpine:latest
 MAINTAINER Peter Boothe <pboothe@google.com>
 # Install all the standard packages we need
-RUN apk update
-RUN apk add python python-dev py2-pip gcc g++ libc-dev bash
+RUN apk update && apk add python python-dev py2-pip gcc g++ libc-dev bash
 # Install all the python requirements
 ADD requirements.txt /requirements.txt
 RUN pip install -r requirements.txt
