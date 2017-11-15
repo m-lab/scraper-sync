@@ -119,20 +119,13 @@ class TestSync(unittest.TestCase):
     def tearDown(self):
         self.json_patcher.stop()
 
-    def test_parse_args_no_spreadsheet(self):
-        with self.assertRaises(SystemExit):
-            with testfixtures.OutputCapture() as _:
-                sync.parse_args([])
-
     def test_parse_args_help(self):
         with self.assertRaises(SystemExit):
             with testfixtures.OutputCapture() as _:
                 sync.parse_args(['-h'])
 
     def test_parse_args(self):
-        args = sync.parse_args(['--spreadsheet', 'hello'])
-        self.assertEqual(args.spreadsheet, 'hello')
-        self.assertTrue(args.expected_upload_interval > 0)
+        args = sync.parse_args([])
         self.assertIs(type(args.datastore_namespace), str)
         self.assertIs(type(args.prometheus_port), int)
         self.assertIs(type(args.webserver_port), int)
@@ -207,84 +200,6 @@ class TestSync(unittest.TestCase):
 
     def test_docstring_exists(self):
         self.assertIsNotNone(sync.__doc__)
-
-    @testfixtures.log_capture()
-    def test_spreadsheet_empty_sheet(self, log):
-        mock_service = mock.Mock()
-        mock_service.spreadsheets().values().get().execute.return_value = {
-            'values': []
-        }
-        mock_service.spreadsheets().values().update().execute.return_value = {
-            'updatedRows': 'a true value'
-        }
-
-        sheet = sync.Spreadsheet(mock_service, 'test_id')
-        sheet.update(sync.get_fleet_data('test_namespace'))
-
-        _args, kwargs = mock_service.spreadsheets().values().update.call_args
-        new_values = kwargs['body']['values']
-        mock_service.spreadsheets().values().get().execute.assert_called()
-        mock_service.spreadsheets().values().update().execute.assert_called()
-        self.assertEqual(new_values[0], sync.KEYS)
-        # One header row, three rows from datastore
-        self.assertEqual(len(new_values), 4)
-        self.assertIn('WARNING', [x.levelname for x in log.records])
-
-    def test_spreadsheet_partly_filled(self):
-        mock_service = mock.Mock()
-        mock_service.spreadsheets().values().get().execute.return_value = {
-            'values': [sync.KEYS] +
-                      [['rsync://utility.mlab.mlab4.prg01.'
-                        'measurement-lab.org:7999/switch'] +
-                       ['' for _ in range(len(sync.KEYS) - 1)],
-                       ['rsync://test'] +
-                       ['' for _ in range(len(sync.KEYS) - 1)]]
-        }
-        mock_service.spreadsheets().values().update().execute.return_value = {
-            'updatedRows': 'a true value'
-        }
-
-        sheet = sync.Spreadsheet(mock_service, 'test_id')
-        sheet.update(sync.get_fleet_data('test_namespace'))
-
-        _args, kwargs = mock_service.spreadsheets().values().update.call_args
-        new_values = kwargs['body']['values']
-        mock_service.spreadsheets().values().get().execute.assert_called()
-        mock_service.spreadsheets().values().update().execute.assert_called()
-        self.assertEqual(new_values[0], sync.KEYS)
-        # One header row, three rows from datastore, one for rsync://test
-        self.assertEqual(len(new_values), 5)
-
-    @testfixtures.log_capture()
-    def test_spreadsheet_update_fails(self, log):
-        mock_service = mock.Mock()
-        mock_service.spreadsheets().values().get().execute.return_value = {
-            'values': [sync.KEYS] +
-                      [['rsync://test'] +
-                       ['' for _ in range(len(sync.KEYS) - 1)]]
-        }
-        mock_service.spreadsheets().values().update().execute.return_value = {
-            'updatedRows': False
-        }
-        sheet = sync.Spreadsheet(mock_service, 'test_id')
-        with self.assertRaises(sync.SyncException):
-            sheet.update(sync.get_fleet_data('test_namespace'))
-
-        mock_service.spreadsheets().values().get().execute.assert_called()
-        mock_service.spreadsheets().values().update().execute.assert_called()
-        self.assertIn('ERROR', [x.levelname for x in log.records])
-
-    @testfixtures.log_capture()
-    def test_spreadsheet_retrieve_fails(self, log):
-        mock_service = mock.Mock()
-        mock_service.spreadsheets().values().get().execute.return_value = {}
-
-        sheet = sync.Spreadsheet(mock_service, 'test_id')
-        with self.assertRaises(sync.SyncException):
-            sheet.update(sync.get_fleet_data('test_namespace'))
-
-        mock_service.spreadsheets().values().get().execute.assert_called()
-        self.assertIn('ERROR', [x.levelname for x in log.records])
 
     def test_parse_xdatetime(self):
         self.assertEqual(sync.parse_xdatetime('x1970-1-1'), 0)

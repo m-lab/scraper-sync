@@ -13,5 +13,4 @@ EXPOSE 9090
 EXPOSE 80
 # Start running the job
 CMD /sync.py \
-    --datastore_namespace=$NAMESPACE \
-    --spreadsheet=$SPREADSHEET
+    --datastore_namespace=$NAMESPACE

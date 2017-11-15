@@ -39,9 +39,6 @@ spec:
       labels:
         application: scraper-sync
     spec:
-      # Scraper nodes have sheets permission scopes, and we need sheets
-      # permissions to write to the spreadsheet.
-      # TODO(https://github.com/m-lab/scraper-sync/issues/40)
       nodeSelector:
         scraper-sync-node: 'true'
       containers:
@@ -50,8 +47,6 @@ spec:
           env:
             - name: NAMESPACE
               value: '{{NAMESPACE}}'
-            - name: SPREADSHEET
-              value: '{{SPREADSHEET_ID}}'
           resources:
             requests:
               memory: "2Gi"

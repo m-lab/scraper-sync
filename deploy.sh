@@ -62,9 +62,6 @@ function git_is_dirty {
 if [[ "$1" == production ]]; then
   KEY_FILE=/tmp/mlab-oti.json
   PROJECT=mlab-oti
-  # TODO(dev): create independent sheets for each project
-  #SHEET_ID=143pU25GJidW2KZ_93hgzHdqTqq22wgdxR_3tt3dvrJY   # Test sheet
-  SHEET_ID=1WftgMyw57gI_5jjKgHbqhRVZBZPADYruwVpw9qmrIdw  # Authoritative sheet
   DATASTORE_NAMESPACE=scraper
   CLUSTER=scraper-cluster
   ZONE=us-central1-a
@@ -76,7 +73,6 @@ if [[ "$1" == production ]]; then
 elif [[ "$1" == staging ]]; then
   KEY_FILE=/tmp/mlab-staging.json
   PROJECT=mlab-staging
-  SHEET_ID=143pU25GJidW2KZ_93hgzHdqTqq22wgdxR_3tt3dvrJY
   DATASTORE_NAMESPACE=scraper
   CLUSTER=scraper-cluster
   ZONE=us-central1-a
@@ -92,7 +88,6 @@ elif [[ "$1" == sandbox-* ]]; then
   [[ -n "${SANDBOXSUFFIX}" ]] || exit 1
   KEY_FILE=/tmp/mlab-sandbox.json
   PROJECT=mlab-sandbox
-  SHEET_ID=143pU25GJidW2KZ_93hgzHdqTqq22wgdxR_3tt3dvrJY
   # DATASTORE_NAMESPACE must be unique to a cluster (within the same project), so in
   # expectation that there might be multiple clusters running in sandbox, we add
   # the suffix to make it unique.
@@ -117,7 +112,6 @@ fi
 # Configure the last pieces of the .yml files
 ./travis/substitute_values.sh deployment \
   IMAGE_URL gcr.io/${PROJECT}/github-m-lab-scraper-sync:${GIT_COMMIT} \
-  SPREADSHEET_ID ${SHEET_ID} \
   NAMESPACE ${DATASTORE_NAMESPACE} \
   GITHUB_COMMIT http://github.com/m-lab/scraper-sync/tree/${GIT_COMMIT} \
   EXTERNAL_IP ${EXTERNAL_IP}
