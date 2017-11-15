@@ -18,24 +18,11 @@
 This is a webserver that reads from cloud datastore and presents the requested
 information in json form.
 
-Nodes in the MLab fleet used to use a spreadsheet to determine what data is and
-is not safe to delete. Unfortunately, if every scraper just wrote to that
-spreadsheet, then we would quickly run out of spreadsheet API quota.  Also, the
-spreadsheet is kind of a janky hack for what really should be a key-value store.
 The new scraper has its source of truth in a key-value store (Google Cloud
-Datastore), and this program has the job of updating the spreadsheet with that
-truth.  In a longer term migration, this script and the spreadsheet should both
-be eliminated, and the scripts in charge of data deletion should read from a
-low-latency source of cloud datastore data.
-
-This program needs to be run on a GCE instance that has access to the Sheets
-API.  Sheets API access is not enabled by default for GCE, and it can't be
-enabled from the web-based GCE instance creation interface.  Worse, the scopes
-that a GCE instance has can't be changed after creation. To create a new GCE
-instance named scraper-dev that has access to both cloud APIs and spreadsheet
-apis, you could use the following command line:
-   gcloud compute instances create scraper-dev \
-       --scopes cloud-platform,https://www.googleapis.com/auth/spreadsheets
+Datastore), and this program has the job of presenting that truth to all who
+request it.  The root url will present a table showing the status of every rsync
+endpoint, and the url /json?rsync_filter=substr will provide the status, in json
+form, of all rsync endpoints that contain substr as a substring.
 """
 
 import argparse
@@ -65,10 +52,6 @@ from google.cloud import datastore
 
 # The monitoring variables exported by the prometheus_client
 # The prometheus_client libraries confuse the linter.
-SUCCESS = prometheus_client.Counter(
-    'spreadsheet_sync_success',
-    'How many times has the sheet update succeeded and failed',
-    ['message'])
 REQUEST_TIMES = prometheus_client.Histogram(
     'request_time_seconds',
     'Running time of web server requests',
@@ -99,8 +82,7 @@ def parse_args(argv):
         A dictionary-like object containing the results of the parse.
     """
     parser = argparse.ArgumentParser(
-        description='Repeatedly upload the synchronization data in Cloud '
-                    'Datastore up to the specified spreadsheet.')
+        description='Present cloud datastore info of scraper status')
     parser.add_argument(
         '--datastore_namespace',
         metavar='NAMESPACE',
@@ -118,7 +100,7 @@ def parse_args(argv):
         metavar='PORT',
         type=int,
         default=80,
-        help='The port on which a summary of the sheet is exported.')
+        help='The port on which a summary of the fleet status is exported.')
     return parser.parse_args(argv)
 
 
@@ -319,11 +301,10 @@ def start_webserver_and_run_forever(port):  # pragma: no cover
 def parse_xdatetime(xdatetime):
     """Turn a datetime string into seconds since epoch.
 
-    Data is stored in the coordinating spreadsheet as a date (plus optional
-    time) string with a leading 'x' character.  The leading x is to prevent the
-    spreadsheet from "helpfully" interpreting it as a datetime rather than just
-    holding the string.  This converts from that string format into seconds
-    since epoch.
+    Data is stored as a date (plus optional time) string with a leading 'x'
+    character.  The leading x was to prevent the spreadsheet from "helpfully"
+    interpreting it as a datetime rather than just holding the string.  This
+    converts from that string format into seconds since epoch.
     """
     if not xdatetime or xdatetime[0] != 'x':
         return None
@@ -437,11 +418,11 @@ class PrometheusDatastoreCollector(object):
 
 
 def main(argv):  # pragma: no cover
-    """Update the spreadsheet in a loop.
+    """Serve up the contents of cloud datastore to all who ask.
 
     Set up the logging, parse the command line, set up monitoring, set up the
     datastore client, set up the spreadsheet client, set up the webserver, and
-    then repeatedly update the spreadsheet and sleep.
+    then httpd.serve_forever().
     """
     # Set up logging
     logging.basicConfig(
