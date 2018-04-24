@@ -32,12 +32,12 @@ import mock
 import requests
 import testfixtures
 
-import sync
-
 # pylint: disable=no-name-in-module
 from google.cloud import datastore
 import google.auth.credentials
 # pylint: enable=no-name-in-module
+
+import sync
 
 
 class EmulatorCreds(google.auth.credentials.Credentials):
@@ -187,8 +187,8 @@ class TestSync(unittest.TestCase):
 
         self.assertEqual(self.mock_handler.wfile.getvalue().count('<td>'), 0)
 
-    @mock.patch.object(sync, 'datastore')
     @testfixtures.log_capture()
+    @mock.patch.object(sync, 'datastore')
     def test_do_get_datastore_failure(self, mock_datastore, log):
         mock_datastore.Client.side_effect = Exception
 
@@ -226,8 +226,8 @@ class TestSync(unittest.TestCase):
                            'experiment': 'utility.mlab'}.items()),
                     set(tuple(x[1].items()) for x in metric.samples))
 
-    @mock.patch.object(sync, 'datastore')
     @testfixtures.log_capture()
+    @mock.patch.object(sync, 'datastore')
     def test_prometheus_forwarding_with_bad_data(self, mock_datastore, log):
         # Put a bad value in the datastore.
         mock_client = mock.Mock()
@@ -263,9 +263,10 @@ class TestSync(unittest.TestCase):
                                  set([1490746201L, 1490746202L]))
         self.assertIn('ERROR', [x.levelname for x in log.records])
 
-    @mock.patch.object(sync, 'datastore')
     @testfixtures.log_capture()
-    def test_prometheus_forwarding_and_retired_sites(self, mock_datastore):
+    @mock.patch.object(sync, 'datastore')
+    def test_prometheus_forwarding_and_retired_sites(self, mock_datastore,
+                                                     _log):
         # Add a datastore entry for a site that should no longer be published.
         # Then confirm that it is filtered from exported metrics.
         mock_client = mock.Mock()
