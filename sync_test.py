@@ -25,6 +25,7 @@
 import datetime
 import json
 import StringIO
+import threading
 import unittest
 
 import freezegun
@@ -363,6 +364,29 @@ class TestSync(unittest.TestCase):
             # ...but that should not effect the caching of future calls.
             self.assertEqual(max_once_per_arg_per_hour('hello'), 2)
             self.assertEqual(['hello', 'hello'], args)
+
+    def test_timed_locking_cache_with_exceptions(self):
+        # This test succeeds when it doesn't deadlock.
+        # Verifies that https://github.com/m-lab/scraper-sync/issues/54 remains
+        # fixed.
+
+        @sync.timed_locking_cache(hours=1)
+        def raiser():
+            raise ValueError('This should not cause deadlock')
+
+        # Lock the cache and raise an exception in another thread.
+        def call_lock_in_other_thread():
+            with self.assertRaises(ValueError):
+                raiser()
+
+        thread = threading.Thread(target=call_lock_in_other_thread)
+        thread.start()
+
+        # Wait for that thread to terminate and then try and access the cache in
+        # this thread.
+        thread.join()
+        with self.assertRaises(ValueError):
+            raiser()
 
     def test_deployed_rsync_urls(self):
         urls = sync.get_deployed_rsync_urls('scraper')

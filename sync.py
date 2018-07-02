@@ -144,15 +144,16 @@ def timed_locking_cache(**kwargs):
         def cached_func(*args, **kwargs):
             """A cached version of the passed-in function."""
             lock.acquire()
-            current = datetime.datetime.now()
-            if 'nocache' in kwargs or \
-                    args not in cache or \
-                    cache[args].expiration < current:
-                cache[args] = CachedData(expiration=current + timeout,
-                                         value=func(*args))
-            value = cache[args].value
-            lock.release()
-            return value
+            try:
+                current = datetime.datetime.now()
+                if 'nocache' in kwargs or \
+                        args not in cache or \
+                        cache[args].expiration < current:
+                    cache[args] = CachedData(expiration=current + timeout,
+                                             value=func(*args))
+                return cache[args].value
+            finally:
+                lock.release()
 
         # Add a clear_cache method to the returned function object to aid in
         # testing.  Code not in a *_test.py file should not use this method.
