@@ -2,6 +2,10 @@
 |:------:|:------------:|:--------:|
 | Master | [![Build Status](https://travis-ci.org/m-lab/scraper-sync.svg?branch=master)](https://travis-ci.org/m-lab/scraper-sync) | [![Coverage Status](https://coveralls.io/repos/github/m-lab/scraper-sync/badge.svg?branch=master)](https://coveralls.io/github/m-lab/scraper-sync?branch=master) |
 
+The scraper system has been turned down. Feel free to fork this repo for your own purposes. M-Lab is keeping it here for historical reasons, but this code is no longer being used.
+
+# scraper-sync
+
 Scraper-sync provides a service that allows individual mlab nodes to query the
 scraper status using the `/json_status` url. To get a JSON object that contains
 only a subset of the data, use the `rsync_filter` argument.  For example, to
