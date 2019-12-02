@@ -13,38 +13,5 @@ sudo: required
 install:
 # Required for code coverage
 - pip install coveralls
-# Required for deployment
-- $TRAVIS_BUILD_DIR/travis/install_gcloud.sh kubectl
 script: ./pre-commit.sh && ./prepare-commit-msg.sh
 after_success: coveralls
-deploy:
-####################################
-## Sandbox
-- provider: script
-  script: ./deploy.sh $TRAVIS_BRANCH travis
-  on:
-    repo: m-lab/scraper-sync
-    all_branches: true
-    condition: $TRAVIS_BRANCH == sandbox-*
-
-####################################
-## Staging
-- provider: script
-  script: ./deploy.sh staging travis
-  on:
-    repo: m-lab/scraper-sync
-    all_branches: true
-    condition: $TRAVIS_BRANCH == master && $TRAVIS_EVENT_TYPE == push
-
-####################################
-## Production
-- provider: script
-  script: ./deploy.sh production travis
-  on:
-    repo: m-lab/scraper-sync
-    # TODO(https://github.com/m-lab/scraper-sync/issues/37) validate tag
-    tags: true
-
-before_install:
-- travis/decrypt.sh "$encrypted_c6050636c18f_key" "$encrypted_c6050636c18f_iv"
-  keys/service-accounts.tar.enc /tmp/service-accounts.tar /tmp
